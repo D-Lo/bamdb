@@ -277,7 +277,7 @@ main(int argc, char *argv[]) {
 	char *work_buffer;
 	samFile *input_file = 0;
 
-    bam_hdr_t *header = NULL;
+	bam_hdr_t *header = NULL;
 	bam1_t *bam_row;
 
 	/* get input file name from trailing arg */
