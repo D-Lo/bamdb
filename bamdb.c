@@ -9,6 +9,9 @@
 
 #include "htslib/sam.h"
 
+#include "include/bam_sl.h"
+#include "include/bam_api.h"
+
 /* I really hope we don't have sequences longer than this */
 #define WORK_BUFFER_SIZE 65536
 
@@ -28,11 +31,9 @@ get_bam_tags(const bam1_t *row, char *buffer)
 	size_t buffer_pos = 0;
 	uint32_t arr_size;
 	char *dummy = 0;
-	int foo = 0;
 
 	aux = bam_get_aux(row);
 	while (aux+4 <= row->data + row->l_data) {
-		foo++;
 		key[0] = aux[0];
 		key[1] = aux[1];
 		sprintf(buffer + buffer_pos, "%c%c:", key[0], key[1]);
@@ -160,106 +161,37 @@ get_bam_tags(const bam1_t *row, char *buffer)
 
 
 static int
-get_bam_row(const bam1_t *row, const bam_hdr_t *header, char *work_buffer)
+print_bam_row(const bam1_t *row, const bam_hdr_t *header, char *work_buffer)
 {
 	static uint32_t rows = 0;
+	char *temp;
 
 	printf("Row %u:\n", rows);
-
-	/* QNAME */
-	const char *qname = bam_get_qname(row);
-	printf("\tQNAME: %s\n", qname);
-
-	/* FLAG */
-	uint32_t flag = row->core.flag;
-	printf("\tFLAG: %u\n", flag);
-
-	/* RNAME */
-	const char *rname;
-	if (row->core.tid >= 0) {
-		rname = header->target_name[row->core.tid];
-	} else {
-		rname = "*";
-	}
-	printf("\tRNAME: %s\n", rname);
-
-	/* POS */
-	int32_t pos = row->core.pos;
-	printf("\tPOS: %d\n", pos);
-
-	/* MAPQ */
+	printf("\tQNAME: %s\n", bam_get_qname(row));
+	printf("\tFLAG: %u\n", row->core.flag);
+	printf("\tRNAME: %s\n", bam_get_rname(row, header));
+	printf("\tPOS: %d\n", row->core.pos);
 	printf("\tMAPQ: %u\n", row->core.qual);
 
-	/* CIGAR */
-	/* CIGAR is an array of uint32s. First 4 bits are the CIGAR opration
-	 * and the following 28 bits are the number of repeats of the op */
-	if (row->core.n_cigar > 0) {
-		uint32_t *cigar = bam_get_cigar(row);
-		size_t cigar_pos = 0;
+	temp = work_buffer;
+	printf("\tCIGAR: %s\n", bam_cigar_str(row, work_buffer));
+	work_buffer = temp;
 
-		for (int i = 0; i < row->core.n_cigar; ++i) {
-			int num_ops = bam_cigar_oplen(cigar[i]);
-			char op = bam_cigar_opchr(cigar[i]);
-			sprintf(work_buffer + cigar_pos, "%d%c", num_ops, op);
-			/* Need enough space for the opcount and the actual opchar
-			 * an example would be something like 55F */
-			cigar_pos += get_int_chars(num_ops) + 1;
-		}
+	printf("\tRNEXT: %s\n", bam_get_rnext(row, header));
+	printf("\tPNEXT: %d\n", row->core.mpos + 1);
+	printf("\tTLEN: %d\n", row->core.isize);
 
-		work_buffer[cigar_pos] = '\0';
-	} else {
-		strcpy(work_buffer, "*\0");
-	}
-	printf("\tCIGAR: %s\n", work_buffer);
+	temp = work_buffer;
+	printf("\tSEQ: %s\n", bam_seq_str(row, work_buffer));
+	work_buffer = temp;
 
-	/* RNEXT */
-	char *rnext;
-	if (row->core.mtid < 0) {
-		rnext = "*";
-	} else if (row->core.mtid == row->core.tid) {
-		/* "=" to save space, could also use full reference name */
-		rnext = "=";
-	} else {
-		rnext = header->target_name[row->core.mtid];
-	}
-	printf("\tRNEXT: %s\n", rnext);
+	temp = work_buffer;
+	printf("\tQUAL: %s\n", bam_qual_str(row, work_buffer));
+	work_buffer = temp;
 
-	/* PNEXT */
-	int32_t pnext = row->core.mpos + 1;
-	printf("\tPNEXT: %d\n", pnext);
-
-	/* TLEN */
-	int32_t tlen = row->core.isize;
-	printf("\tTLEN: %d\n", tlen);
-
-	/* SEQ */
-	int32_t l_qseq = row->core.l_qseq;
-	if (l_qseq > 0) {
-		uint8_t *seq = bam_get_seq(row);
-		for (int i = 0; i < l_qseq; ++i) {
-			/* Need to unpack base letter from its 4 bit encoding */
-			work_buffer[i] = "=ACMGRSVTWYHKDBN"[bam_seqi(seq, i)];
-		}
-		work_buffer[l_qseq] = '\0';
-		printf("\tSEQ: %s\n", work_buffer);
-	} else {
-		printf("\tSEQ: *\n");
-	}
-
-
-	/* QUAL */
-	uint8_t *qual = bam_get_qual(row);
-	if (qual[0] == 0xff || l_qseq <= 0) {
-		/* No quality data, indicate with a '*' */
-		strcpy(work_buffer, "*\0");
-	} else {
-		for (int i = 0; i < l_qseq; ++i) {
-			/* ASCII of base QUALity plus 33 */
-			work_buffer[i] = qual[i] + 33;
-		}
-		work_buffer[l_qseq] = '\0';
-	}
-	printf("\tQUAL: %s\n", work_buffer);
+	temp = work_buffer;
+	printf("\tBX: %s\n", bam_bx_str(row, work_buffer));
+	work_buffer = temp;
 
 	/* TAGs */
 	get_bam_tags(row, work_buffer);
@@ -287,6 +219,9 @@ main(int argc, char *argv[]) {
 		return 1;
 	}
 
+	convert_to_sqlite(input_file, NULL);
+
+	/*
 	header = sam_hdr_read(input_file);
 	if (header == NULL) {
 		fprintf(stderr, "Unable to read the header from %s\n", in_file_name);
@@ -296,7 +231,7 @@ main(int argc, char *argv[]) {
 	bam_row = bam_init1();
 	work_buffer = malloc(WORK_BUFFER_SIZE);
 	while ((r = sam_read1(input_file, header, bam_row)) >= 0) { // read one alignment from `in'
-		get_bam_row(bam_row, header, work_buffer);
+		print_bam_row(bam_row, header, work_buffer);
 	}
 	if (r < -1) {
 		fprintf(stderr, "Attempting to process truncated file.\n");
@@ -304,6 +239,7 @@ main(int argc, char *argv[]) {
 	}
 	free(work_buffer);
 	bam_destroy1(bam_row);
+	*/
 
 	return 0;
 }
