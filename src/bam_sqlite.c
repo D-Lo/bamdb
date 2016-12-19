@@ -3,10 +3,11 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "bam_sl.h"
+#include "bam_sqlite.h"
 #include "bam_api.h"
 
-#define TABLE "CREATE TABLE IF NOT EXISTS seq (id INTEGER PRIMARY KEY, qname TEXT, flag INTEGER, rname TEXT, pos INTEGER, mapq INTEGER, cigar TEXT, rnext STRING, pnext INTEGER, tlen INTEGER, seq STRING, qual STRING, bx STRING)"
+
+#define TABLE "CREATE TABLE IF NOT EXISTS seq (id INTEGER PRIMARY KEY, qname TEXT, bx STRING, bam_record STRING)"
 #define WORK_BUFFER_SIZE 65536
 #define SQL_BUFFER_SIZE 1024
 
@@ -73,8 +74,7 @@ convert_to_sqlite(samFile *input_file, char *db_name)
 		goto exit;
 	}
 
-	sprintf(sql, "INSERT INTO seq VALUES (NULL, @QN, @FL, @RM, @PS, @MQ, @CG, @RN, @PN, @TL, @SQ, @QL, @BX);");
-	// sprintf(sql, "INSERT INTO seq VALUES (NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL);");
+	sprintf(sql, "INSERT INTO seq VALUES (NULL, @QN, @BX, @BR);");
 	rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
 	if (rc != SQLITE_OK) {
 		fprintf(stderr, "Error preparing insert statement: %s\n", sqlite3_errmsg(db));
@@ -91,19 +91,8 @@ convert_to_sqlite(samFile *input_file, char *db_name)
 		buffer_pos = work_buffer;
 
 		sqlite3_bind_text(stmt, 1, bam_get_qname(bam_row), -1, SQLITE_TRANSIENT); /* QNAME */
-		sqlite3_bind_int(stmt, 2, bam_row->core.flag); /* FLAG */
-		sqlite3_bind_text(stmt, 3, bam_get_rname(bam_row, header), -1, SQLITE_TRANSIENT); /* RNAME */
-		sqlite3_bind_int(stmt, 4, bam_row->core.pos); /* POS */
-		sqlite3_bind_int(stmt, 5, bam_row->core.qual); /* MAPQ */
-		sqlite3_bind_text(stmt, 6, bam_cigar_str(bam_row, buffer_pos), -1, SQLITE_TRANSIENT); /* CIGAR */
-		sqlite3_bind_text(stmt, 7, bam_get_rnext(bam_row, header), -1, SQLITE_TRANSIENT); /* RNEXT */
-		sqlite3_bind_int(stmt, 8, bam_row->core.mpos + 1); /* PNEXT */
-		sqlite3_bind_int(stmt, 9, bam_row->core.isize); /* TLEN */
-		sqlite3_bind_text(stmt, 10, bam_seq_str(bam_row, buffer_pos), -1, SQLITE_TRANSIENT); /* SEQ */
-		sqlite3_bind_text(stmt, 11, bam_qual_str(bam_row, buffer_pos), -1, SQLITE_TRANSIENT); /* QUAL */
-		sqlite3_bind_text(stmt, 12, bam_bx_str(bam_row, buffer_pos), -1, SQLITE_TRANSIENT); /* BX */
-		/* TODO: Actually write this out */
-		// sqlite3_bind_text(stmt, 13, NULL, -1, SQLITE_TRANSIENT); /* AUX */
+		sqlite3_bind_text(stmt, 2, bam_bx_str(bam_row, buffer_pos), -1, SQLITE_TRANSIENT); /* BX */
+		sqlite3_bind_text(stmt, 3, bam_bx_str(bam_row, buffer_pos), -1, SQLITE_TRANSIENT); /* Full BAM row */
 
 		rc = sqlite3_step(stmt);
 		if (rc != SQLITE_DONE) {

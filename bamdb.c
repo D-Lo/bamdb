@@ -9,7 +9,8 @@
 
 #include "htslib/sam.h"
 
-#include "include/bam_sl.h"
+#include "include/bamdb.h"
+#include "include/bam_sqlite.h"
 #include "include/bam_api.h"
 
 /* I really hope we don't have sequences longer than this */
@@ -202,30 +203,20 @@ print_bam_row(const bam1_t *row, const bam_hdr_t *header, char *work_buffer)
 }
 
 
-int
-main(int argc, char *argv[]) {
-	int r = 0;
-	char *in_file_name = 0;
-	char *work_buffer;
-	samFile *input_file = 0;
-
+static int
+read_file(samFile *input_file)
+{
 	bam_hdr_t *header = NULL;
 	bam1_t *bam_row;
+	char *work_buffer;
+	int r = 0;
+	int rc = 0;
 
-	/* get input file name from trailing arg */
-	in_file_name = (optind < argc) ? argv[optind] : "-";
-	if ((input_file = sam_open(in_file_name, "r")) == 0) {
-		fprintf(stderr, "Unable to open file %s\n", in_file_name);
-		return 1;
-	}
-
-	convert_to_sqlite(input_file, NULL);
-
-	/*
 	header = sam_hdr_read(input_file);
 	if (header == NULL) {
-		fprintf(stderr, "Unable to read the header from %s\n", in_file_name);
-		return 1;
+		fprintf(stderr, "Unable to read the header from %s\n", input_file->fn);
+		rc = 1;
+		goto exit;
 	}
 
 	bam_row = bam_init1();
@@ -235,11 +226,61 @@ main(int argc, char *argv[]) {
 	}
 	if (r < -1) {
 		fprintf(stderr, "Attempting to process truncated file.\n");
-		return 1;
+		rc = 1;
+		goto exit;
 	}
+
+exit:
 	free(work_buffer);
 	bam_destroy1(bam_row);
-	*/
+	return rc;
+}
 
-	return 0;
+
+int
+main(int argc, char *argv[]) {
+	int rc = 0;
+	int c;
+	samFile *input_file = 0;
+	bam_args_t bam_args;
+
+	bam_args.convert_to = BAMDB_CONVERT_TO_TEXT;
+	while ((c = getopt(argc, argv, "t:f:")) != -1) {
+			switch(c) {
+				case 't':
+					if (strcmp(optarg, "sqlite") == 0) {
+						bam_args.convert_to = BAMDB_CONVERT_TO_SQLITE;
+					} else if (strcmp(optarg, "text") == 0) {
+						bam_args.convert_to = BAMDB_CONVERT_TO_TEXT;
+					} else {
+						fprintf(stderr, "Invalid output format %s\n", optarg);
+						return 1;
+					}
+					break;
+				case 'f':
+					strcpy(bam_args.input_file_name, optarg);
+					break;
+				default:
+					fprintf(stderr, "Unknown argument\n");
+					return 1;
+			}
+	}
+
+	/* Get filename from first non option argument */
+	if (optind < argc) {
+		strcpy(bam_args.input_file_name, argv[optind]);
+	}
+
+	if ((input_file = sam_open(bam_args.input_file_name, "r")) == 0) {
+		fprintf(stderr, "Unable to open file %s\n", bam_args.input_file_name);
+		return 1;
+	}
+
+	if (bam_args.convert_to == BAMDB_CONVERT_TO_SQLITE) {
+		rc = convert_to_sqlite(input_file, NULL);
+	} else {
+		rc = read_file(input_file);
+	}
+
+	return rc;
 }

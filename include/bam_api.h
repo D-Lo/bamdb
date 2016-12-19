@@ -12,3 +12,7 @@ char *bam_seq_str(const bam1_t *row, char *work_buffer);
 char *bam_qual_str(const bam1_t *row, char *work_buffer);
 
 char *bam_bx_str(const bam1_t *row, char *work_buffer);
+
+
+#define bam_row_size(b) (sizeof(struct bam1_t) + b->l_data * sizeof(uint8_t))
+#define bam_row_max_size(b) (sizeof(struct bam1_t) + b->m_data * sizeof(uint8_t))
