@@ -92,7 +92,7 @@ convert_to_sqlite(samFile *input_file, char *db_name)
 
 		sqlite3_bind_text(stmt, 1, bam_get_qname(bam_row), -1, SQLITE_TRANSIENT); /* QNAME */
 		sqlite3_bind_text(stmt, 2, bam_bx_str(bam_row, buffer_pos), -1, SQLITE_TRANSIENT); /* BX */
-		sqlite3_bind_text(stmt, 3, bam_bx_str(bam_row, buffer_pos), -1, SQLITE_TRANSIENT); /* Full BAM row */
+		sqlite3_bind_blob(stmt, 3, &bam_row, bam_row_size(bam_row), SQLITE_TRANSIENT); /* Full BAM row */
 
 		rc = sqlite3_step(stmt);
 		if (rc != SQLITE_DONE) {
