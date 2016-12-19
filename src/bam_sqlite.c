@@ -27,7 +27,7 @@ get_default_dbname(const char *filename)
 
 
 int
-convert_to_sqlite(samFile *input_file, char *db_name)
+convert_to_sqlite(samFile *input_file, char *db_name, int max_rows)
 {
 	sqlite3 *db;
 	sqlite3_stmt *stmt;
@@ -105,6 +105,10 @@ convert_to_sqlite(samFile *input_file, char *db_name)
 		sqlite3_reset(stmt);
 
 		if (++n % 100000 == 0) printf("%u rows inserted\n", n);
+
+		if (max_rows > 0 && n >= max_rows) {
+			break;
+		}
 	}
 	if (r < -1) {
 		fprintf(stderr, "Attempting to process truncated file.\n");

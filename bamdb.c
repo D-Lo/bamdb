@@ -243,9 +243,10 @@ main(int argc, char *argv[]) {
 	int c;
 	samFile *input_file = 0;
 	bam_args_t bam_args;
+	int max_rows = 0;
 
 	bam_args.convert_to = BAMDB_CONVERT_TO_TEXT;
-	while ((c = getopt(argc, argv, "t:f:")) != -1) {
+	while ((c = getopt(argc, argv, "t:f:n:")) != -1) {
 			switch(c) {
 				case 't':
 					if (strcmp(optarg, "sqlite") == 0) {
@@ -259,6 +260,9 @@ main(int argc, char *argv[]) {
 					break;
 				case 'f':
 					strcpy(bam_args.input_file_name, optarg);
+					break;
+				case 'n':
+					max_rows = atoi(optarg);
 					break;
 				default:
 					fprintf(stderr, "Unknown argument\n");
@@ -277,7 +281,7 @@ main(int argc, char *argv[]) {
 	}
 
 	if (bam_args.convert_to == BAMDB_CONVERT_TO_SQLITE) {
-		rc = convert_to_sqlite(input_file, NULL);
+		rc = convert_to_sqlite(input_file, NULL, max_rows);
 	} else {
 		rc = read_file(input_file);
 	}
