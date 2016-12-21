@@ -11,6 +11,7 @@
 
 #include "include/bamdb.h"
 #include "include/bam_sqlite.h"
+#include "include/bam_lmdb.h"
 #include "include/bam_api.h"
 
 /* I really hope we don't have sequences longer than this */
@@ -251,6 +252,8 @@ main(int argc, char *argv[]) {
 				case 't':
 					if (strcmp(optarg, "sqlite") == 0) {
 						bam_args.convert_to = BAMDB_CONVERT_TO_SQLITE;
+					} else if (strcmp(optarg, "lmdb") == 0) {
+						bam_args.convert_to = BAMDB_CONVERT_TO_LMDB;
 					} else if (strcmp(optarg, "text") == 0) {
 						bam_args.convert_to = BAMDB_CONVERT_TO_TEXT;
 					} else {
@@ -282,6 +285,8 @@ main(int argc, char *argv[]) {
 
 	if (bam_args.convert_to == BAMDB_CONVERT_TO_SQLITE) {
 		rc = convert_to_sqlite(input_file, NULL, max_rows);
+	} else if (bam_args.convert_to == BAMDB_CONVERT_TO_LMDB) {
+		rc = convert_to_lmdb(input_file, NULL, max_rows);
 	} else {
 		rc = read_file(input_file);
 	}
