@@ -28,34 +28,34 @@ static const char *lmdb_key_names[LMDB_MAX] = {
 };
 
 static char *
-get_default_dbpath(const char *filename)
+get_default_dbname(const char *filename)
 {
-	char *db_path;
+	char *db_name;
 	char *dot = strrchr(filename, '.');
 
-	db_path = malloc(dot - filename + sizeof(LMDB_POSTFIX) + 1); /* Leak this */
-	strncpy(db_path, filename, dot - filename);
-	strcpy(db_path + (dot - filename), LMDB_POSTFIX);
+	db_name = malloc(dot - filename + sizeof(LMDB_POSTFIX) + 1); /* Leak this */
+	strncpy(db_name, filename, dot - filename);
+	strcpy(db_name + (dot - filename), LMDB_POSTFIX);
 
-	return db_path;
+	return db_name;
 }
 
 
 static int
-start_transactions(MDB_env **env, MDB_dbi *dbi, MDB_txn **txn)
+start_transaction(MDB_env *env, MDB_dbi *dbi, MDB_txn **txn)
 {
 	int rc;
 
-	for (int i = 0; i < LMDB_MAX; i++) {
-		rc = mdb_txn_begin(env[i], NULL, 0, &txn[i]);
-		if (rc != MDB_SUCCESS) {
-			fprintf(stderr, "Error beginning transaction: %s", mdb_strerror(rc));
-			return 1;
-		}
+	rc = mdb_txn_begin(env, NULL, 0, txn);
+	if (rc != MDB_SUCCESS) {
+		fprintf(stderr, "Error beginning transaction: %s\n", mdb_strerror(rc));
+		return 1;
+	}
 
-		rc = mdb_open(txn[i], NULL, 0, &dbi[i]);
+	for (int i = 0; i < LMDB_MAX; i++) {
+		rc = mdb_dbi_open(*txn, lmdb_key_names[i], MDB_DUPSORT | MDB_CREATE, &dbi[i]);
 		if (rc != MDB_SUCCESS) {
-			fprintf(stderr, "Error opening transaction: %s", mdb_strerror(rc));
+			fprintf(stderr, "Error opening database: %s\n", mdb_strerror(rc));
 			return 1;
 		}
 	}
@@ -65,16 +65,14 @@ start_transactions(MDB_env **env, MDB_dbi *dbi, MDB_txn **txn)
 
 
 static int
-commit_transactions(MDB_txn **txn)
+commit_transaction(MDB_txn *txn)
 {
 	int rc;
 
-	for (int i = 0; i < LMDB_MAX; i++) {
-		rc = mdb_txn_commit(txn[i]);
-		if (rc != MDB_SUCCESS) {
-			fprintf(stderr, "Error commiting transaction: %s", mdb_strerror(rc));
-			return 1;
-		}
+	rc = mdb_txn_commit(txn);
+	if (rc != MDB_SUCCESS) {
+		fprintf(stderr, "Error commiting transaction: %s\n", mdb_strerror(rc));
+		return 1;
 	}
 
 	return 0;
@@ -91,7 +89,7 @@ put_entry(MDB_env *env, MDB_txn *txn, MDB_dbi dbi, MDB_val *key, MDB_val *data, 
 			*mapsize *= 2;
 			mdb_env_set_mapsize(env, *mapsize);
 		} else {
-			fprintf(stderr, "Error putting qname: %s\n", mdb_strerror(rc));
+			fprintf(stderr, "Error putting entry: %s\n", mdb_strerror(rc));
 			return 1;
 		}
 
@@ -103,13 +101,12 @@ put_entry(MDB_env *env, MDB_txn *txn, MDB_dbi dbi, MDB_val *key, MDB_val *data, 
 
 
 int
-convert_to_lmdb(samFile *input_file, char *db_path, int max_rows)
+convert_to_lmdb(samFile *input_file, char *db_name, int max_rows)
 {
-	MDB_env *env[LMDB_MAX];
+	MDB_env *env;
 	MDB_dbi dbi[LMDB_MAX];
 	MDB_val key, data;
-	MDB_txn *txn[LMDB_MAX];
-	char db_name[PATH_MAX];
+	MDB_txn *txn;
 	int mapsize = LMDB_INIT_MAPSIZE;
 	int rc, r;
 	int ret = 0;
@@ -119,38 +116,38 @@ convert_to_lmdb(samFile *input_file, char *db_path, int max_rows)
 	char *work_buffer = malloc(WORK_BUFFER_SIZE);
 	char *buffer_pos = work_buffer;
 
-	if (db_path == NULL) {
-		db_path = get_default_dbpath(input_file->fn);
+	if (db_name == NULL) {
+		db_name = get_default_dbname(input_file->fn);
 	}
-	printf("Attempting to convert bam file %s into lmdb database at path %s\n", input_file->fn, db_path);
+	printf("Attempting to convert bam file %s into lmdb database at path %s\n", input_file->fn, db_name);
 
-	mkdir(db_path, 0777);
+	mkdir(db_name, 0777);
 
-	for (int i = 0; i < LMDB_MAX; i++) {
-		sprintf(db_name, "%s/%s", db_path, lmdb_key_names[i]);
-		mkdir(db_name, 0777);
-
-		rc = mdb_env_create(&env[i]);
-		if (rc != MDB_SUCCESS) {
-			fprintf(stderr, "Error creating env %s: %s\n", db_name, mdb_strerror(rc));
-			return 1;
-		}
-
-		rc = mdb_env_set_mapsize(env[i], mapsize);
-		if (rc != MDB_SUCCESS) {
-			fprintf(stderr, "Error setting map size %s: %s\n", db_name, mdb_strerror(rc));
-			return 1;
-		}
-
-		//rc = mdb_env_open(env[i], db_name, MDB_DUPSORT | MDB_CREATE, 0664);
-		rc = mdb_env_open(env[i], db_name, 0, 0664);
-		if (rc != MDB_SUCCESS) {
-			fprintf(stderr, "Error opening env %s: %s\n", db_name, mdb_strerror(rc));
-			return 1;
-		}
+	rc = mdb_env_create(&env);
+	if (rc != MDB_SUCCESS) {
+		fprintf(stderr, "Error creating env: %s\n", mdb_strerror(rc));
+		return 1;
 	}
 
-	if (start_transactions(env, dbi, txn) != 0) {
+	rc = mdb_env_set_maxdbs(env, LMDB_MAX);	
+	if (rc != MDB_SUCCESS) {
+		fprintf(stderr, "Error setting maxdbs: %s\n", mdb_strerror(rc));
+		return 1;
+	}
+
+	rc = mdb_env_set_mapsize(env, mapsize);
+	if (rc != MDB_SUCCESS) {
+		fprintf(stderr, "Error setting map size: %s\n", mdb_strerror(rc));
+		return 1;
+	}
+
+	rc = mdb_env_open(env, db_name, 0, 0664);
+	if (rc != MDB_SUCCESS) {
+		fprintf(stderr, "Error opening env: %s\n", mdb_strerror(rc));
+		return 1;
+	}
+
+	if (start_transaction(env, dbi, &txn) != 0) {
 		ret = 1;
 		goto exit;
 	}
@@ -178,7 +175,7 @@ convert_to_lmdb(samFile *input_file, char *db_path, int max_rows)
 		key.mv_size = strlen(qname);
 		key.mv_data = qname;
 
-		if (put_entry(env[LMDB_QNAME], txn[LMDB_QNAME], dbi[LMDB_QNAME], &key, &data, &mapsize) != 0) {
+		if (put_entry(env, txn, dbi[LMDB_QNAME], &key, &data, &mapsize) != 0) {
 			ret = 1;
 			goto exit;
 		}
@@ -187,7 +184,7 @@ convert_to_lmdb(samFile *input_file, char *db_path, int max_rows)
 		key.mv_size = strlen(bx);
 		key.mv_data = bx;
 
-		if (put_entry(env[LMDB_BX], txn[LMDB_BX], dbi[LMDB_BX], &key, &data, &mapsize) != 0) {
+		if (put_entry(env, txn, dbi[LMDB_BX], &key, &data, &mapsize) != 0) {
 			ret = 1;
 			goto exit;
 		}
@@ -200,12 +197,12 @@ convert_to_lmdb(samFile *input_file, char *db_path, int max_rows)
 
 		/* commit every so often for safety */
 		if (n % LMDB_COMMIT_FREQ == 0) {
-			if (commit_transactions(txn) != 0) {
+			if (commit_transaction(txn) != 0) {
 				ret = 1;
 				goto exit;
 			}
 
-			if (start_transactions(env, dbi, txn) != 0) {
+			if (start_transaction(env, dbi, &txn) != 0) {
 				ret = 1;
 				goto exit;
 			}
@@ -218,13 +215,13 @@ convert_to_lmdb(samFile *input_file, char *db_path, int max_rows)
 		goto exit;
 	}
 
-	commit_transactions(txn);
+	commit_transaction(txn);
 
 exit:
 	for (int i = 0; i < LMDB_MAX; i++) {
-		mdb_close(env[i], dbi[i]);
-		mdb_env_close(env[i]);
+		mdb_dbi_close(env, dbi[i]);
 	}
+	mdb_env_close(env);
 
 	return ret;
 }
