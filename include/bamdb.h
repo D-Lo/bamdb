@@ -3,7 +3,8 @@
 
 enum bamdb_convert_to {
 	BAMDB_CONVERT_TO_TEXT,
-	BAMDB_CONVERT_TO_SQLITE
+	BAMDB_CONVERT_TO_SQLITE,
+	BAMDB_CONVERT_TO_LMDB
 };
 
 typedef struct bamdb_args {
