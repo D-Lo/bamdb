@@ -6,8 +6,10 @@
 #include "bam_sqlite.h"
 #include "bam_api.h"
 
+#include "htslib/bgzf.h"
+#include "htslib/hts.h"
 
-#define TABLE "CREATE TABLE IF NOT EXISTS seq (id INTEGER PRIMARY KEY, qname TEXT, bx STRING, bam_record STRING)"
+#define TABLE "CREATE TABLE IF NOT EXISTS seq (qname TEXT, bx STRING, pos INTEGER PRIMARY KEY)"
 #define WORK_BUFFER_SIZE 65536
 #define SQL_BUFFER_SIZE 1024
 
@@ -74,7 +76,7 @@ convert_to_sqlite(samFile *input_file, char *db_name, int max_rows)
 		goto exit;
 	}
 
-	sprintf(sql, "INSERT INTO seq VALUES (NULL, @QN, @BX, @BR);");
+	sprintf(sql, "INSERT INTO seq VALUES (@QN, @BX, @PS);");
 	rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
 	if (rc != SQLITE_OK) {
 		fprintf(stderr, "Error preparing insert statement: %s\n", sqlite3_errmsg(db));
@@ -92,7 +94,7 @@ convert_to_sqlite(samFile *input_file, char *db_name, int max_rows)
 
 		sqlite3_bind_text(stmt, 1, bam_get_qname(bam_row), -1, SQLITE_TRANSIENT); /* QNAME */
 		sqlite3_bind_text(stmt, 2, bam_bx_str(bam_row, buffer_pos), -1, SQLITE_TRANSIENT); /* BX */
-		sqlite3_bind_blob(stmt, 3, &bam_row, bam_row_size(bam_row), SQLITE_TRANSIENT); /* Full BAM row */
+		sqlite3_bind_int64(stmt, 3, bgzf_tell(input_file->fp.bgzf)); /* Virtual file offset */
 
 		rc = sqlite3_step(stmt);
 		if (rc != SQLITE_DONE) {
