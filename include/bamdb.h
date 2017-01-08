@@ -10,4 +10,6 @@ enum bamdb_convert_to {
 typedef struct bamdb_args {
 	enum bamdb_convert_to convert_to;
 	char input_file_name[MAX_FILENAME];
+	char *index_file_name;
+	char *bx;
 } bam_args_t;

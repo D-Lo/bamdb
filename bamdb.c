@@ -8,6 +8,7 @@
 #include <unistd.h>
 
 #include "htslib/sam.h"
+#include "htslib/bgzf.h"
 
 #include "include/bamdb.h"
 #include "include/bam_sqlite.h"
@@ -203,15 +204,17 @@ print_bam_row(const bam1_t *row, const bam_hdr_t *header, char *work_buffer)
 	return 0;
 }
 
-
+	
 static int
-read_file(samFile *input_file)
+read_file(samFile *input_file, offset_list_t *offset_list)
 {
 	bam_hdr_t *header = NULL;
 	bam1_t *bam_row;
 	char *work_buffer;
 	int r = 0;
 	int rc = 0;
+	int64_t src = 0;
+	offset_node_t *offset_node;
 
 	header = sam_hdr_read(input_file);
 	if (header == NULL) {
@@ -222,8 +225,25 @@ read_file(samFile *input_file)
 
 	bam_row = bam_init1();
 	work_buffer = malloc(WORK_BUFFER_SIZE);
-	while ((r = sam_read1(input_file, header, bam_row)) >= 0) { // read one alignment from `in'
-		print_bam_row(bam_row, header, work_buffer);
+	if (offset_list != NULL) {
+		offset_node = offset_list->head;
+		while (offset_node != NULL) {
+			src = bgzf_seek(input_file->fp.bgzf, offset_node->offset, SEEK_SET);
+			if (src != 0) {
+				fprintf(stderr, "Error seeking to file offset\n");
+				rc = 1;
+				goto exit;
+			}
+
+			r = sam_read1(input_file, header, bam_row);
+			print_bam_row(bam_row, header, work_buffer);
+			offset_node = offset_node->next;
+		}
+	} else {
+		while ((r = sam_read1(input_file, header, bam_row)) >= 0) { // read one alignment from `in'
+			print_bam_row(bam_row, header, work_buffer);
+		}
+
 	}
 	if (r < -1) {
 		fprintf(stderr, "Attempting to process truncated file.\n");
@@ -245,9 +265,12 @@ main(int argc, char *argv[]) {
 	samFile *input_file = 0;
 	bam_args_t bam_args;
 	int max_rows = 0;
+	offset_list_t *offset_list = NULL;
 
+	bam_args.index_file_name = NULL;
+	bam_args.bx = NULL;
 	bam_args.convert_to = BAMDB_CONVERT_TO_TEXT;
-	while ((c = getopt(argc, argv, "t:f:n:")) != -1) {
+	while ((c = getopt(argc, argv, "t:f:n:i:b:")) != -1) {
 			switch(c) {
 				case 't':
 					if (strcmp(optarg, "sqlite") == 0) {
@@ -267,6 +290,12 @@ main(int argc, char *argv[]) {
 				case 'n':
 					max_rows = atoi(optarg);
 					break;
+				case 'i':
+					bam_args.index_file_name = strdup(optarg);
+					break;
+				case 'b':
+					bam_args.bx = strdup(optarg);
+					break;
 				default:
 					fprintf(stderr, "Unknown argument\n");
 					return 1;
@@ -283,12 +312,17 @@ main(int argc, char *argv[]) {
 		return 1;
 	}
 
+	if (bam_args.bx != NULL && bam_args.index_file_name != NULL) {
+		offset_list = calloc(1, sizeof(offset_list_t));
+		get_offsets(offset_list, bam_args.index_file_name, bam_args.bx);
+	}
+
 	if (bam_args.convert_to == BAMDB_CONVERT_TO_SQLITE) {
 		rc = convert_to_sqlite(input_file, NULL, max_rows);
 	} else if (bam_args.convert_to == BAMDB_CONVERT_TO_LMDB) {
 		rc = convert_to_lmdb(input_file, NULL, max_rows);
 	} else {
-		rc = read_file(input_file);
+		rc = read_file(input_file, offset_list);
 	}
 
 	return rc;

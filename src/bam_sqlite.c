@@ -1,10 +1,9 @@
-
+#include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "bam_sqlite.h"
-#include "bam_api.h"
 
 #include "htslib/bgzf.h"
 #include "htslib/hts.h"
@@ -12,6 +11,7 @@
 #define TABLE "CREATE TABLE IF NOT EXISTS seq (qname TEXT, bx STRING, pos INTEGER PRIMARY KEY)"
 #define WORK_BUFFER_SIZE 65536
 #define SQL_BUFFER_SIZE 1024
+
 
 static char *
 get_default_dbname(const char *filename)
@@ -126,4 +126,52 @@ exit:
 	free(work_buffer);
 	sqlite3_close(db);
 	return ret;
+}
+
+
+static int
+offset_query_cb(void *data, int argc, char **argv, char **col_names)
+{
+	/* Not thread safe */
+	offset_node_t *new_node = calloc(1, sizeof(offset_node_t));
+	offset_list_t *offset_list = (offset_list_t *)data;
+
+	new_node->offset = strtoll(argv[0], NULL, 10);
+	if (offset_list->head == NULL) {
+		offset_list->head = new_node;
+		offset_list->tail = new_node;
+	} else {
+		offset_list->tail->next = new_node;
+		offset_list->tail = new_node;
+	}
+
+	return 0;
+}
+
+
+int
+get_offsets(offset_list_t *offset_list, const char *sqlite_db_name, const char *bx)
+{
+	sqlite3 *db;
+	char sql[SQL_BUFFER_SIZE];
+	char *err_msg = 0;
+	int rc;
+
+	rc = sqlite3_open(sqlite_db_name, &db);
+	if (rc != SQLITE_OK) {
+		fprintf(stderr, "Error opening sqlite database %s: %s\n", sqlite_db_name, sqlite3_errmsg(db));
+		goto exit;
+	}
+
+	sprintf(sql, "SELECT pos FROM seq WHERE bx ='%s'", bx);
+	rc = sqlite3_exec(db, sql, offset_query_cb, (void*)offset_list, &err_msg);
+	if (rc != SQLITE_OK) {
+		fprintf(stderr, "Error executing SQL: %s\n", err_msg);
+		sqlite3_free(err_msg);
+		goto exit;
+	}
+
+exit:
+	sqlite3_close(db);
+	return 1;
 }
