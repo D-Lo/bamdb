@@ -1,4 +1,4 @@
-#include <linux/limits.h>
+#include <limits.h>
 #include <lmdb.h>
 #include <stdio.h>
 #include <stdlib.h>
