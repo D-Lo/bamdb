@@ -1,8 +1,8 @@
 CC		= gcc
-CFLAGS	= -Wall -g -std=c99
+CFLAGS	= -Wall -g -std=gnu99
 
 SOURCES	:= src/bam_api.c src/bam_sqlite.c src/bam_lmdb.c
-LIB		:= -lhts -lm -lsqlite3 -llmdb
+LIB		:= -lhts -lm -lsqlite3 -llmdb -lpthread
 INC		:= -I include
 
 all:
