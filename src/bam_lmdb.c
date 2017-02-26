@@ -221,6 +221,8 @@ writer_func(void *arg)
 			key.mv_data = entry->bx;
 			put_entry(data->env, txn, dbi[LMDB_BX], &key, &val, &mapsize);
 
+			printf("Key: %s Value we want: %"PRId64" value we got: %"PRId64"\n", entry->bx, entry->voffset, *(int64_t *)val.mv_data);
+
 			free(entry->qname);
 			free(entry->bx);
 			free(entry);
@@ -242,6 +244,11 @@ writer_func(void *arg)
 	for (int i = 0; i < LMDB_MAX; i++) {
 		mdb_dbi_close(data->env, dbi[i]);
 	}
+
+	struct MDB_stat stats;
+	mdb_env_stat(data->env, &stats);
+	printf("%d records written!\n", (int)stats.ms_entries);
+
 	mdb_env_close(data->env);
 
 	pthread_exit(NULL);
@@ -289,8 +296,7 @@ convert_to_lmdb(samFile *input_file, char *db_name, int max_rows)
 		return 1;
 	}
 
-	// rc = mdb_env_open(env, db_name, MDB_WRITEMAP | MDB_NOLOCK, 0664);
-	rc = mdb_env_open(env, db_name, 0, 0664);
+	rc = mdb_env_open(env, db_name, MDB_WRITEMAP | MDB_NOLOCK, 0664);
 	if (rc != MDB_SUCCESS) {
 		fprintf(stderr, "Error opening env: %s\n", mdb_strerror(rc));
 		return 1;
@@ -323,7 +329,7 @@ convert_to_lmdb(samFile *input_file, char *db_name, int max_rows)
 	}
 
 	int n = 0;
-	while (r >= 0 && n < 100000) {
+	while (r >= 0 && n < 10000) {
 		bam_data_t *entry = malloc(sizeof(bam_data_t));
 		ck_fifo_mpmc_entry_t *fifo_entry = malloc(sizeof(ck_fifo_mpmc_entry_t));
 		entry->bam_row = bam_init1();
@@ -362,13 +368,14 @@ int
 get_offsets(offset_list_t *offset_list, const char *lmdb_db_name, const char *bx)
 {
 	MDB_env *env;
-	MDB_dbi dbi;
+	MDB_dbi dbi[LMDB_MAX];
 	MDB_cursor *cur;
 	MDB_txn *txn;
 	MDB_val key, data;
 	int rc;
 
 	rc = mdb_env_create(&env);
+	rc = mdb_env_set_maxdbs(env, LMDB_MAX);
 	rc = mdb_env_open(env, lmdb_db_name, MDB_RDONLY, 0644);
 	if (rc != MDB_SUCCESS) {
 		fprintf(stderr, "Error opening env: %s\n", mdb_strerror(rc));
@@ -381,21 +388,38 @@ get_offsets(offset_list_t *offset_list, const char *lmdb_db_name, const char *bx
 		return 1;
 	}
 
-	rc = mdb_dbi_open(txn, "bx", MDB_DUPSORT | MDB_DUPFIXED, &dbi);
+	rc = mdb_dbi_open(txn, lmdb_key_names[LMDB_BX],
+			MDB_DUPSORT | MDB_DUPFIXED, &dbi[LMDB_BX]);
+	if (rc != MDB_SUCCESS) {
+		fprintf(stderr, "Error opening database %s\n", mdb_strerror(rc));
+		return 1;
+	}
 
 	key.mv_size = strlen(bx);
 	key.mv_data = strdup(bx);
 	printf("%s\n", (char *)key.mv_data);
-	rc = mdb_txn_begin(env, NULL, 1, &txn);
-	rc = mdb_cursor_open(txn, dbi, &cur);
-	while ((rc = mdb_cursor_get(cur, &key, &data, MDB_NEXT)) == 0) {
-		offset_node_t *new_node = calloc(1, sizeof(offset_node_t));
-		new_node->offset = strtoll(data.mv_data, NULL, 10);
 
-		if (offset_list->head == NULL) {
-			offset_list->head = new_node;
-			offset_list->tail = new_node;
-		} else {
+	rc = mdb_cursor_open(txn, dbi[LMDB_BX], &cur);
+	if (rc != MDB_SUCCESS) {
+		fprintf(stderr, "Error getting cursor: %s\n", mdb_strerror(rc));
+		return 1;
+	}
+
+	if ((rc = mdb_cursor_get(cur, &key, &data, MDB_SET)) != MDB_SUCCESS) {
+		fprintf(stderr, "Error getting key: %s\n", mdb_strerror(rc));
+		return 1;
+	}
+	if ((rc = mdb_cursor_get(cur, &key, &data, MDB_FIRST_DUP)) == 0) {
+		offset_node_t *new_node = calloc(1, sizeof(offset_node_t));
+		new_node->offset = *(int64_t *)data.mv_data;
+
+		offset_list->head = new_node;
+		offset_list->tail = new_node;
+
+		while ((rc = mdb_cursor_get(cur, &key, &data, MDB_NEXT_DUP)) == 0) {
+			offset_node_t *new_node = calloc(1, sizeof(offset_node_t));
+			new_node->offset = *(int64_t *)data.mv_data;
+
 			offset_list->tail->next = new_node;
 			offset_list->tail = new_node;
 		}
