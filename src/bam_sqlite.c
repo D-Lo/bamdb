@@ -148,7 +148,7 @@ offset_query_cb(void *data, int argc, char **argv, char **col_names)
 	return 0;
 }
 
-
+/*
 int
 get_offsets(offset_list_t *offset_list, const char *sqlite_db_name, const char *bx)
 {
@@ -175,3 +175,4 @@ exit:
 	sqlite3_close(db);
 	return 1;
 }
+*/
