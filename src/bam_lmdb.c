@@ -221,8 +221,6 @@ writer_func(void *arg)
 			key.mv_data = entry->bx;
 			put_entry(data->env, txn, dbi[LMDB_BX], &key, &val, &mapsize);
 
-			printf("Key: %s Value we want: %"PRId64" value we got: %"PRId64"\n", entry->bx, entry->voffset, *(int64_t *)val.mv_data);
-
 			free(entry->qname);
 			free(entry->bx);
 			free(entry);
@@ -241,13 +239,13 @@ writer_func(void *arg)
 	}
 
 	commit_transaction(txn);
+	mdb_env_sync(data->env, 1);
 	for (int i = 0; i < LMDB_MAX; i++) {
 		mdb_dbi_close(data->env, dbi[i]);
 	}
 
 	struct MDB_stat stats;
 	mdb_env_stat(data->env, &stats);
-	printf("%d records written!\n", (int)stats.ms_entries);
 
 	mdb_env_close(data->env);
 
@@ -296,7 +294,7 @@ convert_to_lmdb(samFile *input_file, char *db_name, int max_rows)
 		return 1;
 	}
 
-	rc = mdb_env_open(env, db_name, MDB_WRITEMAP | MDB_NOLOCK, 0664);
+	rc = mdb_env_open(env, db_name, MDB_WRITEMAP | MDB_MAPASYNC | MDB_NOLOCK, 0664);
 	if (rc != MDB_SUCCESS) {
 		fprintf(stderr, "Error opening env: %s\n", mdb_strerror(rc));
 		return 1;
@@ -328,8 +326,7 @@ convert_to_lmdb(samFile *input_file, char *db_name, int max_rows)
 		goto exit;
 	}
 
-	int n = 0;
-	while (r >= 0 && n < 10000) {
+	while (r >= 0) {
 		bam_data_t *entry = malloc(sizeof(bam_data_t));
 		ck_fifo_mpmc_entry_t *fifo_entry = malloc(sizeof(ck_fifo_mpmc_entry_t));
 		entry->bam_row = bam_init1();
@@ -344,7 +341,6 @@ convert_to_lmdb(samFile *input_file, char *db_name, int max_rows)
 			ck_fifo_mpmc_enqueue(deserialize_q, fifo_entry, entry);
 			ck_pr_inc_int(&deserialize_queue_size);
 		}
-		n++;
 	}
 	ck_pr_dec_int(&reader_running);
 
