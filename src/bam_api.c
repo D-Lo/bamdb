@@ -116,7 +116,7 @@ bam_qual_str(const bam1_t *row, char *work_buffer)
 char *
 bam_bx_str(const bam1_t *row, char *work_buffer)
 {
-	/* Hoping that BXZ doesn't appear for any other purposes in the aux field */
+	/* XXX: Hoping that BXZ doesn't appear for any other purposes in the aux field */
 	uint8_t *aux;
 	char *ret = work_buffer;
 	uint8_t *bx_pos = 0;
