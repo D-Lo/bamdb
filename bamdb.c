@@ -11,7 +11,6 @@
 #include "htslib/bgzf.h"
 
 #include "include/bamdb.h"
-#include "include/bam_sqlite.h"
 #include "include/bam_lmdb.h"
 #include "include/bam_api.h"
 
@@ -273,9 +272,7 @@ main(int argc, char *argv[]) {
 	while ((c = getopt(argc, argv, "t:f:n:i:b:")) != -1) {
 			switch(c) {
 				case 't':
-					if (strcmp(optarg, "sqlite") == 0) {
-						bam_args.convert_to = BAMDB_CONVERT_TO_SQLITE;
-					} else if (strcmp(optarg, "lmdb") == 0) {
+					if (strcmp(optarg, "lmdb") == 0) {
 						bam_args.convert_to = BAMDB_CONVERT_TO_LMDB;
 					} else if (strcmp(optarg, "text") == 0) {
 						bam_args.convert_to = BAMDB_CONVERT_TO_TEXT;
@@ -317,9 +314,7 @@ main(int argc, char *argv[]) {
 		get_offsets(offset_list, bam_args.index_file_name, bam_args.bx);
 	}
 
-	if (bam_args.convert_to == BAMDB_CONVERT_TO_SQLITE) {
-		rc = convert_to_sqlite(input_file, NULL, max_rows);
-	} else if (bam_args.convert_to == BAMDB_CONVERT_TO_LMDB) {
+	if (bam_args.convert_to == BAMDB_CONVERT_TO_LMDB) {
 		rc = convert_to_lmdb(input_file, NULL, max_rows);
 	} else {
 		rc = read_file(input_file, offset_list);
