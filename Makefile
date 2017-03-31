@@ -7,7 +7,7 @@ INC		:= -I include
 
 all:
 	@mkdir -p bin/
-	$(CC) $(CFLAGS) $(SOURCES) bamdb.c -L /usr/include -o bin/bamdb $(LIB) $(INC)
+	$(CC) $(CFLAGS) $(SOURCES) bamdb.c -L /usr/local -o bin/bamdb $(LIB) $(INC)
 
 clean:
 	rm -f bin/bamdb

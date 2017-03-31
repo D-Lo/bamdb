@@ -203,13 +203,13 @@ print_bam_row(const bam1_t *row, const bam_hdr_t *header, char *work_buffer)
 	return 0;
 }
 
-	
+
 static int
 read_file(samFile *input_file, offset_list_t *offset_list)
 {
 	bam_hdr_t *header = NULL;
 	bam1_t *bam_row;
-	char *work_buffer;
+	char *work_buffer = NULL;
 	int r = 0;
 	int rc = 0;
 	int64_t src = 0;
@@ -219,7 +219,7 @@ read_file(samFile *input_file, offset_list_t *offset_list)
 	if (header == NULL) {
 		fprintf(stderr, "Unable to read the header from %s\n", input_file->fn);
 		rc = 1;
-		goto exit;
+		return 1;
 	}
 
 	bam_row = bam_init1();

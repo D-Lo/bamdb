@@ -18,11 +18,11 @@
 #include "htslib/hts.h"
 
 #define LMDB_POSTFIX "_lmdb"
-#define LMDB_COMMIT_FREQ 5000000
+#define LMDB_COMMIT_FREQ 500000
 #define WORK_BUFFER_SIZE 65536
-#define LMDB_INIT_MAPSIZE 1099511627776 /* Making this huge because we don't want to resize*/
+#define LMDB_INIT_MAPSIZE 100000000000 /* Making this huge because we don't want to resize*/
 
-#define DESERIALIZE_THREAD_COUNT 4
+#define DESERIALIZE_THREAD_COUNT 2
 #define MAX_DESERIALIZE_QUEUE_SIZE 16384
 #define MAX_WRITE_QUEUE_SIZE 16384
 
@@ -169,6 +169,7 @@ deserialize_func(void *arg)
 			}
 
 			bam_destroy1(deserialize_entry->bam_row);
+			free(garbage);
 			free(deserialize_entry);
 		}
 
@@ -186,21 +187,39 @@ writer_func(void *arg)
 	writer_thread_data_t *data = (writer_thread_data_t *)arg;
 
 	MDB_val key, val;
-	MDB_txn *txn;
+	MDB_txn *txn = NULL;
 	MDB_dbi dbi[LMDB_MAX];
-	uint64_t n;
+	MDB_cursor *bx_cur;
+	uint64_t n = 0;
+	int rc;
 
 	write_entry_t *entry;
 	ck_fifo_mpmc_entry_t *garbage;
 
 	uint64_t mapsize = LMDB_INIT_MAPSIZE;
-	int rc = mdb_env_set_mapsize(data->env, mapsize);
+	rc = mdb_env_set_mapsize(data->env, mapsize);
 	if (rc != MDB_SUCCESS) {
 		fprintf(stderr, "Error setting map size: %s\n", mdb_strerror(rc));
 	}
 
-	/* TODO: check that this worked */
-	start_transaction(data->env, dbi, &txn);
+	// start_transaction(data->env, dbi, &txn);
+	rc = mdb_txn_begin(data->env, NULL, 0, &txn);
+	if (rc != MDB_SUCCESS) {
+		fprintf(stderr, "Error starting transaction: %s\n", mdb_strerror(rc));
+		return NULL;
+	}
+
+	rc = mdb_dbi_open(txn, lmdb_key_names[LMDB_BX], MDB_DUPSORT | MDB_CREATE | MDB_DUPFIXED, &dbi[LMDB_BX]);
+	if (rc != MDB_SUCCESS) {
+		fprintf(stderr, "Error opening database: %s\n", mdb_strerror(rc));
+		return 1;
+	}
+
+	rc = mdb_cursor_open(txn, dbi[LMDB_BX], &bx_cur);
+	if (rc != MDB_SUCCESS) {
+		fprintf(stderr, "Error getting cursor: %s\n", mdb_strerror(rc));
+		return NULL;
+	}
 
 	while (ck_pr_load_int(&deserialize_running)) {
 		while (ck_fifo_mpmc_trydequeue(write_q, &entry, &garbage) == true) {
@@ -219,7 +238,12 @@ writer_func(void *arg)
 			/* insert voffset under bx */
 			key.mv_size = strlen(entry->bx);
 			key.mv_data = entry->bx;
-			put_entry(data->env, txn, dbi[LMDB_BX], &key, &val, &mapsize);
+			rc = mdb_cursor_put(bx_cur, &key, &val, 0);
+			if (rc != MDB_SUCCESS) {
+				fprintf(stderr, "Error inserting data: %s\n", mdb_strerror(rc));
+				return NULL;
+			}
+			// put_entry(data->env, txn, dbi[LMDB_BX], &key, &val, &mapsize);
 
 			free(entry->qname);
 			free(entry->bx);
@@ -229,15 +253,34 @@ writer_func(void *arg)
 			ck_pr_dec_int(&write_queue_size);
 			/* commit every so often for safety */
 			if (n % LMDB_COMMIT_FREQ == 0) {
+				mdb_cursor_close(bx_cur);
 				commit_transaction(txn);
 				printf("%" PRIu64 " records written. Deserialize queue: %d Write queue: %d\n", n, ck_pr_load_int(&deserialize_queue_size), ck_pr_load_int(&write_queue_size));
-				start_transaction(data->env, dbi, &txn);
+				// start_transaction(data->env, dbi, &txn);
+				rc = mdb_txn_begin(data->env, NULL, 0, &txn);
+				if (rc != MDB_SUCCESS) {
+					fprintf(stderr, "Error starting transaction: %s\n", mdb_strerror(rc));
+					return NULL;
+				}
+
+				rc = mdb_dbi_open(txn, lmdb_key_names[LMDB_BX], MDB_DUPSORT | MDB_DUPFIXED, &dbi[LMDB_BX]);
+				if (rc != MDB_SUCCESS) {
+					fprintf(stderr, "Error opening database: %s\n", mdb_strerror(rc));
+					return 1;
+				}
+
+				rc = mdb_cursor_open(txn, dbi[LMDB_BX], &bx_cur);
+				if (rc != MDB_SUCCESS) {
+					fprintf(stderr, "Error getting cursor: %s\n", mdb_strerror(rc));
+					return NULL;
+				}
 			}
 		}
 
 		usleep(100);
 	}
 
+	mdb_cursor_close(bx_cur);
 	commit_transaction(txn);
 	mdb_env_sync(data->env, 1);
 	for (int i = 0; i < LMDB_MAX; i++) {
@@ -294,7 +337,9 @@ convert_to_lmdb(samFile *input_file, char *db_name, int max_rows)
 		return 1;
 	}
 
-	rc = mdb_env_open(env, db_name, MDB_WRITEMAP | MDB_MAPASYNC | MDB_NOLOCK, 0664);
+	// rc = mdb_env_open(env, db_name, MDB_WRITEMAP | MDB_MAPASYNC | MDB_NOLOCK, 0664);
+	// rc = mdb_env_open(env, db_name, MDB_NOLOCK, 0664);
+	rc = mdb_env_open(env, db_name, MDB_WRITEMAP | MDB_NOLOCK, 0664);
 	if (rc != MDB_SUCCESS) {
 		fprintf(stderr, "Error opening env: %s\n", mdb_strerror(rc));
 		return 1;
@@ -310,7 +355,7 @@ convert_to_lmdb(samFile *input_file, char *db_name, int max_rows)
 	for (size_t i = 0; i < DESERIALIZE_THREAD_COUNT; i++) {
 		deserialize_thread_data_t deserialize_thread_args;
 		deserialize_thread_args.header = header;
-		rc = pthread_create(&threads[1 + i], NULL, deserialize_func, &deserialize_thread_args);
+		rc = pthread_create(&threads[i], NULL, deserialize_func, &deserialize_thread_args);
 		if (rc != 0) {
 			fprintf(stderr, "Received non-zero return code when launching deserialize thread: %d\n", rc);
 			ret = 1;
@@ -319,7 +364,7 @@ convert_to_lmdb(samFile *input_file, char *db_name, int max_rows)
 	}
 
 	writer_thread_args.env = env;
-	rc = pthread_create(&threads[DESERIALIZE_THREAD_COUNT + 1], NULL, writer_func, &writer_thread_args);
+	rc = pthread_create(&threads[DESERIALIZE_THREAD_COUNT], NULL, writer_func, &writer_thread_args);
 	if (rc != 0) {
 		fprintf(stderr, "Received non-zero return code when launching writer thread: %d\n", rc);
 		ret = 1;
@@ -349,12 +394,12 @@ convert_to_lmdb(samFile *input_file, char *db_name, int max_rows)
 		ret = -1;
 		goto exit;
 	}
-	for (size_t i = 0; i < DESERIALIZE_THREAD_COUNT + 1; i++) {
+	for (size_t i = 0; i < DESERIALIZE_THREAD_COUNT; i++) {
 		pthread_join(threads[i], NULL);
 	}
 
 	/* Wait for writer */
-	pthread_join(threads[DESERIALIZE_THREAD_COUNT + 1], NULL);
+	pthread_join(threads[DESERIALIZE_THREAD_COUNT], NULL);
 exit:
 	return ret;
 }
