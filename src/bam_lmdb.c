@@ -212,7 +212,7 @@ writer_func(void *arg)
 	rc = mdb_dbi_open(txn, lmdb_key_names[LMDB_BX], MDB_DUPSORT | MDB_CREATE | MDB_DUPFIXED, &dbi[LMDB_BX]);
 	if (rc != MDB_SUCCESS) {
 		fprintf(stderr, "Error opening database: %s\n", mdb_strerror(rc));
-		return 1;
+		return NULL;
 	}
 
 	rc = mdb_cursor_open(txn, dbi[LMDB_BX], &bx_cur);
@@ -266,7 +266,7 @@ writer_func(void *arg)
 				rc = mdb_dbi_open(txn, lmdb_key_names[LMDB_BX], MDB_DUPSORT | MDB_DUPFIXED, &dbi[LMDB_BX]);
 				if (rc != MDB_SUCCESS) {
 					fprintf(stderr, "Error opening database: %s\n", mdb_strerror(rc));
-					return 1;
+					return NULL;
 				}
 
 				rc = mdb_cursor_open(txn, dbi[LMDB_BX], &bx_cur);
@@ -338,8 +338,8 @@ convert_to_lmdb(samFile *input_file, char *db_name, int max_rows)
 	}
 
 	// rc = mdb_env_open(env, db_name, MDB_WRITEMAP | MDB_MAPASYNC | MDB_NOLOCK, 0664);
-	// rc = mdb_env_open(env, db_name, MDB_NOLOCK, 0664);
-	rc = mdb_env_open(env, db_name, MDB_WRITEMAP | MDB_NOLOCK, 0664);
+	rc = mdb_env_open(env, db_name, MDB_NOLOCK, 0664);
+	// rc = mdb_env_open(env, db_name, MDB_WRITEMAP | MDB_NOLOCK, 0664);
 	if (rc != MDB_SUCCESS) {
 		fprintf(stderr, "Error opening env: %s\n", mdb_strerror(rc));
 		return 1;
