@@ -6,4 +6,8 @@
 
 
 int convert_to_lmdb(samFile *input_file, char *db_path, int max_rows);
+
+/* Return number of offsets on success, -1 on failure */
 int get_offsets(offset_list_t *offset_list, const char *lmdb_db_name, const char *bx);
+
+bam_row_set_t *get_bx_rows(char *input_file_name, char *db_path, char *bx);

@@ -81,29 +81,6 @@ get_default_dbname(const char *filename)
 
 
 static int
-start_transaction(MDB_env *env, MDB_dbi *dbi, MDB_txn **txn)
-{
-	int rc;
-
-	rc = mdb_txn_begin(env, NULL, 0, txn);
-	if (rc != MDB_SUCCESS) {
-		fprintf(stderr, "Error beginning transaction: %s\n", mdb_strerror(rc));
-		return 1;
-	}
-
-	for (int i = 0; i < LMDB_MAX; i++) {
-		rc = mdb_dbi_open(*txn, lmdb_key_names[i], MDB_DUPSORT | MDB_CREATE | MDB_DUPFIXED, &dbi[i]);
-		if (rc != MDB_SUCCESS) {
-			fprintf(stderr, "Error opening database: %s\n", mdb_strerror(rc));
-			return 1;
-		}
-	}
-
-	return 0;
-}
-
-
-static int
 commit_transaction(MDB_txn *txn)
 {
 	int rc;
@@ -112,29 +89,6 @@ commit_transaction(MDB_txn *txn)
 	if (rc != MDB_SUCCESS) {
 		fprintf(stderr, "Error commiting transaction: %s\n", mdb_strerror(rc));
 		return 1;
-	}
-
-	return 0;
-}
-
-
-static int
-put_entry(MDB_env *env, MDB_txn *txn, MDB_dbi dbi, MDB_val *key, MDB_val *data, uint64_t *mapsize)
-{
-	int rc = mdb_put(txn, dbi, key, data, 0);
-
-	while (rc != MDB_SUCCESS) {
-		if (rc == MDB_MAP_FULL) {
-			commit_transaction(txn);
-			*mapsize *= 2;
-			mdb_env_set_mapsize(env, *mapsize);
-			start_transaction(env, &dbi, &txn);
-		} else {
-			fprintf(stderr, "Error putting entry: %s\n", mdb_strerror(rc));
-			return 1;
-		}
-
-		rc = mdb_put(txn, dbi, key, data, 0);
 	}
 
 	return 0;
@@ -202,7 +156,6 @@ writer_func(void *arg)
 		fprintf(stderr, "Error setting map size: %s\n", mdb_strerror(rc));
 	}
 
-	// start_transaction(data->env, dbi, &txn);
 	rc = mdb_txn_begin(data->env, NULL, 0, &txn);
 	if (rc != MDB_SUCCESS) {
 		fprintf(stderr, "Error starting transaction: %s\n", mdb_strerror(rc));
@@ -243,7 +196,6 @@ writer_func(void *arg)
 				fprintf(stderr, "Error inserting data: %s\n", mdb_strerror(rc));
 				return NULL;
 			}
-			// put_entry(data->env, txn, dbi[LMDB_BX], &key, &val, &mapsize);
 
 			free(entry->qname);
 			free(entry->bx);
@@ -256,7 +208,6 @@ writer_func(void *arg)
 				mdb_cursor_close(bx_cur);
 				commit_transaction(txn);
 				printf("%" PRIu64 " records written. Deserialize queue: %d Write queue: %d\n", n, ck_pr_load_int(&deserialize_queue_size), ck_pr_load_int(&write_queue_size));
-				// start_transaction(data->env, dbi, &txn);
 				rc = mdb_txn_begin(data->env, NULL, 0, &txn);
 				if (rc != MDB_SUCCESS) {
 					fprintf(stderr, "Error starting transaction: %s\n", mdb_strerror(rc));
@@ -414,41 +365,41 @@ get_offsets(offset_list_t *offset_list, const char *lmdb_db_name, const char *bx
 	MDB_txn *txn;
 	MDB_val key, data;
 	int rc;
+	int rows = 0;
 
 	rc = mdb_env_create(&env);
 	rc = mdb_env_set_maxdbs(env, LMDB_MAX);
 	rc = mdb_env_open(env, lmdb_db_name, MDB_RDONLY, 0644);
 	if (rc != MDB_SUCCESS) {
 		fprintf(stderr, "Error opening env: %s\n", mdb_strerror(rc));
-		return 1;
+		return -1;
 	}
 
 	rc = mdb_txn_begin(env, NULL, MDB_RDONLY, &txn);
 	if (rc != MDB_SUCCESS) {
 		fprintf(stderr, "Error beginning transaction: %s\n", mdb_strerror(rc));
-		return 1;
+		return -1;
 	}
 
 	rc = mdb_dbi_open(txn, lmdb_key_names[LMDB_BX],
 			MDB_DUPSORT | MDB_DUPFIXED, &dbi[LMDB_BX]);
 	if (rc != MDB_SUCCESS) {
 		fprintf(stderr, "Error opening database %s\n", mdb_strerror(rc));
-		return 1;
+		return -1;
 	}
 
 	key.mv_size = strlen(bx);
 	key.mv_data = strdup(bx);
-	printf("%s\n", (char *)key.mv_data);
 
 	rc = mdb_cursor_open(txn, dbi[LMDB_BX], &cur);
 	if (rc != MDB_SUCCESS) {
 		fprintf(stderr, "Error getting cursor: %s\n", mdb_strerror(rc));
-		return 1;
+		return -1;
 	}
 
 	if ((rc = mdb_cursor_get(cur, &key, &data, MDB_SET)) != MDB_SUCCESS) {
 		fprintf(stderr, "Error getting key: %s\n", mdb_strerror(rc));
-		return 1;
+		return -1;
 	}
 	if ((rc = mdb_cursor_get(cur, &key, &data, MDB_FIRST_DUP)) == 0) {
 		offset_node_t *new_node = calloc(1, sizeof(offset_node_t));
@@ -463,10 +414,54 @@ get_offsets(offset_list_t *offset_list, const char *lmdb_db_name, const char *bx
 
 			offset_list->tail->next = new_node;
 			offset_list->tail = new_node;
+			rows++;
 		}
 	}
 
 	mdb_cursor_close(cur);
 	mdb_txn_abort(txn);
-	return 0;
+	return rows;
+}
+
+
+bam_row_set_t *
+get_bx_rows(char *input_file_name, char *db_path, char *bx)
+{
+	samFile *input_file = 0;
+	bam_hdr_t *header = NULL;
+	int n_rows = 0;
+	offset_list_t *offset_list = NULL;
+	offset_node_t *offset_node;
+	bam_row_set_t *row_set = NULL;
+	int i = 0;
+
+	if ((input_file = sam_open(input_file_name, "r")) == 0) {
+		fprintf(stderr, "Unable to open file %s\n", input_file_name);
+		return NULL;
+	}
+
+	header = sam_hdr_read(input_file);
+	if (header == NULL) {
+		fprintf(stderr, "Unable to read the header from %s\n", input_file->fn);
+		return NULL;
+	}
+
+	n_rows = get_offsets(offset_list, db_path, bx);
+	if (n_rows <= 0) {
+		return NULL;
+	}
+
+	row_set = malloc(sizeof(bam_row_set_t));
+	row_set->n_entries = n_rows;
+	row_set->rows = malloc(n_rows * sizeof(bam_row_set_t));
+
+	offset_node = offset_list->head;
+	while (offset_node != NULL) {
+		/* TODO: make sure we don't overrun row_set */
+		row_set->rows[i] = get_bam_row(offset_node->offset, input_file, header);
+		offset_node = offset_node->next;
+		i++;
+	}
+
+	return row_set;
 }

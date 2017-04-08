@@ -14,9 +14,6 @@
 #include "include/bam_lmdb.h"
 #include "include/bam_api.h"
 
-/* I really hope we don't have sequences longer than this */
-#define WORK_BUFFER_SIZE 65536
-
 #define get_int_chars(i) ((i == 0) ? 1 : floor(log10(abs(i))) + 1)
 
 
@@ -183,15 +180,12 @@ print_bam_row(const bam1_t *row, const bam_hdr_t *header, char *work_buffer)
 	printf("\tPNEXT: %d\n", row->core.mpos + 1);
 	printf("\tTLEN: %d\n", row->core.isize);
 
-	temp = work_buffer;
 	printf("\tSEQ: %s\n", bam_seq_str(row, work_buffer));
 	work_buffer = temp;
 
-	temp = work_buffer;
 	printf("\tQUAL: %s\n", bam_qual_str(row, work_buffer));
 	work_buffer = temp;
 
-	temp = work_buffer;
 	printf("\tBX: %s\n", bam_bx_str(row, work_buffer));
 	work_buffer = temp;
 

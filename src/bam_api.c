@@ -3,6 +3,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "htslib/sam.h"
+#include "htslib/bgzf.h"
+
 #include "bam_api.h"
 
 #define get_int_chars(i) ((i == 0) ? 1 : floor(log10(abs(i))) + 1)
@@ -144,4 +147,57 @@ bam_bx_str(const bam1_t *row, char *work_buffer)
 	}
 
 	return ret;
+}
+
+
+bam_sequence_row_t *
+deserialize_bam_row(const bam1_t *row, const bam_hdr_t *header)
+{
+	bam_sequence_row_t *r = malloc(sizeof(bam_sequence_row_t));
+	char *temp = malloc(WORK_BUFFER_SIZE);
+	char *work_buffer = temp;
+
+	r->qname = strdup(bam_get_qname(row));
+	r->flag = row->core.flag;
+	r->rname = strdup(bam_get_rname(row, header));
+	r->pos = row->core.pos;
+	r->mapq = row->core.qual;
+	r->cigar = strdup(bam_cigar_str(row, work_buffer));
+	work_buffer = temp;
+	r->rnext = strdup(bam_get_rnext(row, header));
+	r->pnext = row->core.mpos + 1;
+	r->tlen = row->core.isize;
+	r->seq = strdup(bam_seq_str(row, work_buffer));
+	work_buffer = temp;
+	r->qual = strdup(bam_qual_str(row, work_buffer));
+
+	return r;
+}
+
+
+bam_sequence_row_t *
+get_bam_row(int64_t offset, samFile *input_file, bam_hdr_t *header)
+{
+	bam1_t *bam_row = NULL;
+	int64_t src = 0;
+	int r = 0;
+	bam_sequence_row_t *ret = NULL;
+
+	src = bgzf_seek(input_file->fp.bgzf, offset, SEEK_SET);
+	r = sam_read1(input_file, header, bam_row);
+	ret = deserialize_bam_row(bam_row, header);
+
+	bam_destroy1(bam_row);
+	return ret;
+}
+
+
+void
+destroy_bam_sequence_row(bam_sequence_row_t *row)
+{
+	free(row->qname);
+	free(row->rname);
+	free(row->cigar);
+	free(row->rnext);
+	free(row);
 }
