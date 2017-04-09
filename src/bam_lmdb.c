@@ -446,6 +446,7 @@ get_bx_rows(char *input_file_name, char *db_path, char *bx)
 		return NULL;
 	}
 
+	offset_list = calloc(1, sizeof(offset_list_t));
 	n_rows = get_offsets(offset_list, db_path, bx);
 	if (n_rows <= 0) {
 		return NULL;

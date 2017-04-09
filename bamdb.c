@@ -298,20 +298,20 @@ main(int argc, char *argv[]) {
 		strcpy(bam_args.input_file_name, argv[optind]);
 	}
 
+	if (bam_args.bx != NULL && bam_args.index_file_name != NULL) {
+		bam_row_set_t *row_set = get_bx_rows(bam_args.input_file_name, bam_args.index_file_name, bam_args.bx);
+		for (int j = 0; j < row_set->n_entries; ++j) {
+			print_sequence_row(row_set->rows[j]);
+		}
+	}
+
 	if ((input_file = sam_open(bam_args.input_file_name, "r")) == 0) {
 		fprintf(stderr, "Unable to open file %s\n", bam_args.input_file_name);
 		return 1;
 	}
 
-	if (bam_args.bx != NULL && bam_args.index_file_name != NULL) {
-		offset_list = calloc(1, sizeof(offset_list_t));
-		get_offsets(offset_list, bam_args.index_file_name, bam_args.bx);
-	}
-
 	if (bam_args.convert_to == BAMDB_CONVERT_TO_LMDB) {
 		rc = convert_to_lmdb(input_file, NULL, max_rows);
-	} else {
-		rc = read_file(input_file, offset_list);
 	}
 
 	return rc;

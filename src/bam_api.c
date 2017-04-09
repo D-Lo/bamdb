@@ -178,7 +178,7 @@ deserialize_bam_row(const bam1_t *row, const bam_hdr_t *header)
 bam_sequence_row_t *
 get_bam_row(int64_t offset, samFile *input_file, bam_hdr_t *header)
 {
-	bam1_t *bam_row = NULL;
+	bam1_t *bam_row = bam_init1();
 	int64_t src = 0;
 	int r = 0;
 	bam_sequence_row_t *ret = NULL;
@@ -189,6 +189,23 @@ get_bam_row(int64_t offset, samFile *input_file, bam_hdr_t *header)
 
 	bam_destroy1(bam_row);
 	return ret;
+}
+
+
+void
+print_sequence_row(bam_sequence_row_t *row)
+{
+	printf("%s", row->qname);
+	printf("\t%d", row->flag);
+	printf("\t%s", row->rname);
+	printf("\t%d", row->pos);
+	printf("\t%d", row->mapq);
+	printf("\t%s", row->cigar);
+	printf("\t%s", row->rnext);
+	printf("\t%d", row->pnext);
+	printf("\t%d", row->tlen);
+	printf("\t%s", row->seq);
+	printf("\t%s\n", row->qual);
 }
 
 
