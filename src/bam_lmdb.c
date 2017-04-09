@@ -247,7 +247,7 @@ writer_func(void *arg)
 }
 
 int
-convert_to_lmdb(samFile *input_file, char *db_name, int max_rows)
+convert_to_lmdb(samFile *input_file, char *db_name)
 {
 	MDB_env *env;
 	int rc;

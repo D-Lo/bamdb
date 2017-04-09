@@ -251,6 +251,20 @@ exit:
 }
 
 
+int 
+generate_index_file (char *input_file_name)
+{
+	samFile *input_file = 0;
+
+	if ((input_file = sam_open(input_file_name, "r")) == 0) {
+		fprintf(stderr, "Unable to open file %s\n", input_file_name);
+		return 1;
+	}
+
+	return convert_to_lmdb(input_file, NULL);
+}
+
+
 int
 main(int argc, char *argv[]) {
 	int rc = 0;
@@ -311,7 +325,7 @@ main(int argc, char *argv[]) {
 	}
 
 	if (bam_args.convert_to == BAMDB_CONVERT_TO_LMDB) {
-		rc = convert_to_lmdb(input_file, NULL, max_rows);
+		rc = convert_to_lmdb(input_file, NULL);
 	}
 
 	return rc;
