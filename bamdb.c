@@ -269,7 +269,6 @@ int
 main(int argc, char *argv[]) {
 	int rc = 0;
 	int c;
-	samFile *input_file = 0;
 	bam_args_t bam_args;
 	int max_rows = 0;
 
@@ -319,13 +318,8 @@ main(int argc, char *argv[]) {
 		free_row_set(row_set);
 	}
 
-	if ((input_file = sam_open(bam_args.input_file_name, "r")) == 0) {
-		fprintf(stderr, "Unable to open file %s\n", bam_args.input_file_name);
-		return 1;
-	}
-
 	if (bam_args.convert_to == BAMDB_CONVERT_TO_LMDB) {
-		rc = convert_to_lmdb(input_file, NULL);
+		rc = generate_index_file(bam_args.input_file_name);
 	}
 
 	return rc;
