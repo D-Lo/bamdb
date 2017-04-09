@@ -258,7 +258,6 @@ main(int argc, char *argv[]) {
 	samFile *input_file = 0;
 	bam_args_t bam_args;
 	int max_rows = 0;
-	offset_list_t *offset_list = NULL;
 
 	bam_args.index_file_name = NULL;
 	bam_args.bx = NULL;
@@ -303,6 +302,7 @@ main(int argc, char *argv[]) {
 		for (int j = 0; j < row_set->n_entries; ++j) {
 			print_sequence_row(row_set->rows[j]);
 		}
+		free_row_set(row_set);
 	}
 
 	if ((input_file = sam_open(bam_args.input_file_name, "r")) == 0) {

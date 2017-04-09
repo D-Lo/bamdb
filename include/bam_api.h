@@ -49,6 +49,7 @@ bam_sequence_row_t *deserialize_bam_row(const bam1_t *row, const bam_hdr_t *head
 bam_sequence_row_t *get_bam_row(int64_t offset, samFile *input_file, bam_hdr_t *header);
 void print_sequence_row(bam_sequence_row_t *row);
 void destroy_bam_sequence_row(bam_sequence_row_t *row);
+void free_row_set(bam_row_set_t *row_set);
 
 
 #define bam_row_size(b) (sizeof(bam1_t) + b->l_data * sizeof(uint8_t))
