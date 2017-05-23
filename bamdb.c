@@ -304,6 +304,7 @@ write_row_subset(char *input_file_name, offset_list_t *offset_list, char *out_fi
 		}
 	}
 
+	bgzf_close(fp);
 	return rc;
 }
 
