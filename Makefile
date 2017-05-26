@@ -1,13 +1,29 @@
+.PHONY: clean install uninstall
+
 CC		= clang
 CFLAGS	= -Wall -g -std=gnu99
 
-SOURCES	:= src/bam_api.c src/bam_lmdb.c
-LIB		:= -lhts -lm -llmdb -lpthread
-INC		:= -I include
+BUILD_DIR   = build
+INCLUDE_DIR = include
+SRC_DIR     = src
+PREFIX      = /usr/local
 
-all:
-	@mkdir -p bin/
-	$(CC) $(CFLAGS) $(SOURCES) bamdb.c -L /usr/local -o bin/bamdb $(LIB) $(INC)
+TARGET = bamdb
+LIBS   = -lhts -lm -llmdb -lpthread
+INC    = -I $(INCLUDE_DIR)
+
+OBJECTS = $(patsubst %.c, %.o, $(wildcard $(SRC_DIR)/*.c))
+HEADERS = $(wildcard $(INCLUDE_DIR)/*.h)
+
+%.o: %.c $(HEADERS)
+	mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) $(INC) -c $< -o $(patsubst src/%, $(BUILD_DIR)/%, $@)
+
+BUILT_OBJECTS = $(patsubst src/%, $(BUILD_DIR)/%, $(OBJECTS))
+
+$(TARGET): $(BUILT_OBJECTS)
+	$(CC) $(BUILT_OBJECTS) $(CFLAGS) $(INC) $(LIBS) -o $(BUILD_DIR)/$@
 
 clean:
-	rm -f bin/bamdb
+	-rm -f $(BUILD_DIR)/*.o
+	-rm -f $(BUILD_DIR)/$(TARGET)
