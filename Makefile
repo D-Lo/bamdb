@@ -21,7 +21,7 @@ HEADERS = $(wildcard $(INCLUDE_DIR)/*.h)
 
 BUILT_OBJECTS = $(patsubst src/%, $(BUILD_DIR)/%, $(OBJECTS))
 
-$(TARGET): $(BUILT_OBJECTS)
+$(TARGET): $(OBJECTS)
 	$(CC) $(BUILT_OBJECTS) $(CFLAGS) $(INC) $(LIBS) -o $(BUILD_DIR)/$@
 
 clean:

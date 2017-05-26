@@ -10,9 +10,9 @@
 #include "htslib/sam.h"
 #include "htslib/bgzf.h"
 
-#include "include/bamdb.h"
-#include "include/bam_lmdb.h"
-#include "include/bam_api.h"
+#include "bamdb.h"
+#include "bam_lmdb.h"
+#include "bam_api.h"
 
 #define get_int_chars(i) ((i == 0) ? 1 : floor(log10(abs(i))) + 1)
 
