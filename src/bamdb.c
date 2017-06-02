@@ -310,7 +310,7 @@ write_row_subset(char *input_file_name, offset_list_t *offset_list, char *out_fi
 
 
 int
-generate_index_file (char *input_file_name)
+generate_index_file (char *input_file_name, char *output_file_name)
 {
 	samFile *input_file = 0;
 
@@ -319,7 +319,7 @@ generate_index_file (char *input_file_name)
 		return 1;
 	}
 
-	return convert_to_lmdb(input_file, NULL);
+	return convert_to_lmdb(input_file, output_file_name);
 }
 
 
@@ -391,7 +391,7 @@ main(int argc, char *argv[]) {
 	}
 
 	if (bam_args.convert_to == BAMDB_CONVERT_TO_LMDB) {
-		rc = generate_index_file(bam_args.input_file_name);
+		rc = generate_index_file(bam_args.input_file_name, bam_args.output_file_name);
 	}
 
 	return rc;
