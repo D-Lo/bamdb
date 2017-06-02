@@ -8,9 +8,10 @@ INCLUDE_DIR = include
 SRC_DIR     = src
 PREFIX      = /usr/local
 
-TARGET = bamdb
-LIBS   = -lhts -lm -llmdb -lpthread
-INC    = -I $(INCLUDE_DIR)
+TARGET   = bamdb
+ALIB     = libbamdb.a
+INC_LIBS = -lhts -lm -llmdb -lpthread
+INC      = -I $(INCLUDE_DIR)
 
 OBJECTS = $(patsubst %.c, %.o, $(wildcard $(SRC_DIR)/*.c))
 HEADERS = $(wildcard $(INCLUDE_DIR)/*.h)
@@ -22,8 +23,25 @@ HEADERS = $(wildcard $(INCLUDE_DIR)/*.h)
 BUILT_OBJECTS = $(patsubst src/%, $(BUILD_DIR)/%, $(OBJECTS))
 
 $(TARGET): $(OBJECTS)
-	$(CC) $(BUILT_OBJECTS) $(CFLAGS) $(INC) $(LIBS) -o $(BUILD_DIR)/$@
+	$(CC) $(BUILT_OBJECTS) $(CFLAGS) $(INC) $(INC_LIBS) -o $(BUILD_DIR)/$@
+
+$(ALIB): $(BUILT_OBJECTS)
+	$(AR) rcs $(BUILD_DIR)/$@ $^
+
+install: $(ALIB)
+	mkdir -p $(DESTDIR)$(PREFIX)/lib
+	mkdir -p $(DESTDIR)$(PREFIX)/include
+	cp $(BUILD_DIR)/$(ALIB) $(DESTDIR)$(PREFIX)/lib/$(ALIB)
+	cp $(HEADERS) $(DESTDIR)$(PREFIX)/include/
+
+uninstall:
+	rm -f $(DESTDIR)$(PREFIX)/lib/$(ALIB)
+	# TODO: autopopulate this list
+	rm -f $(DESTDIR)$(PREFIX)/include/bam_api.h
+	rm -f $(DESTDIR)$(PREFIX)/include/bam_lmdb.h
+	rm -f $(DESTDIR)$(PREFIX)/include/bamdb.h
 
 clean:
 	-rm -f $(BUILD_DIR)/*.o
 	-rm -f $(BUILD_DIR)/$(TARGET)
+	-rm -f $(BUILD_DIR)/$(ALIB)
