@@ -1,7 +1,8 @@
 .PHONY: clean install uninstall
 
 CC		= clang
-CFLAGS	= -Wall -g -std=gnu99
+CFLAGS	= -Wall -g -std=gnu99 -fPIC
+LDFLAGS = -shared
 
 BUILD_DIR   = build
 INCLUDE_DIR = include
@@ -10,6 +11,7 @@ PREFIX      = /usr/local
 
 TARGET   = bamdb
 ALIB     = libbamdb.a
+SLIB     = libbamdb.so
 INC_LIBS = -lhts -lm -llmdb -lpthread
 INC      = -I $(INCLUDE_DIR)
 
@@ -28,10 +30,16 @@ $(TARGET): $(OBJECTS)
 $(ALIB): $(BUILT_OBJECTS)
 	$(AR) rcs $(BUILD_DIR)/$@ $^
 
-install: $(ALIB)
+$(SLIB): $(BUILT_OBJECTS)
+	$(CC) $(CFLAGS) $(INC_LIBS) -o $(SLIB) $(BUILT_OBJECTS)
+
+# clang -Wall -g -std=gnu99 -fPIC -lhts -lm -llmdb -lpthread -o build/libbamdb.so  build/bam_lmdb.o  build/bam_api.o  build/bamdb.o
+
+install: $(ALIB) $(SLIB)
 	mkdir -p $(DESTDIR)$(PREFIX)/lib
 	mkdir -p $(DESTDIR)$(PREFIX)/include
 	cp $(BUILD_DIR)/$(ALIB) $(DESTDIR)$(PREFIX)/lib/$(ALIB)
+	cp $(BUILD_DIR)/$(SLIB) $(DESTDIR)$(PREFIX)/lib/$(SLIB)
 	cp $(HEADERS) $(DESTDIR)$(PREFIX)/include/
 
 uninstall:

@@ -1,6 +1,6 @@
 /* Some additional functions to simplify pulling rows from BAM data */
-#ifndef _BAMAPIH_
-#define _BAMAPIH_
+#ifndef BAMAPI_H
+#define BAMAPI_H
 
 #include "htslib/sam.h"
 
