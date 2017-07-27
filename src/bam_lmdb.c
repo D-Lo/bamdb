@@ -22,7 +22,7 @@
 #define WORK_BUFFER_SIZE 65536
 #define LMDB_INIT_MAPSIZE 100000000000 /* Making this huge because we don't want to resize*/
 
-#define DESERIALIZE_THREAD_COUNT 2
+#define DESERIALIZE_THREAD_COUNT 1
 #define MAX_DESERIALIZE_QUEUE_SIZE 16384
 #define MAX_WRITE_QUEUE_SIZE 16384
 
