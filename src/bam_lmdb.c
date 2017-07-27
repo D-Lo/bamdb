@@ -65,6 +65,8 @@ int deserialize_running;
 int write_queue_size;
 int deserialize_queue_size;
 
+pthread_mutex_t deserialize_q_lock = PTHREAD_MUTEX_INITIALIZER;
+
 static char *
 get_default_dbname(const char *filename)
 {
@@ -101,12 +103,17 @@ deserialize_func(void *arg)
     (void) arg;
 	char *work_buffer = malloc(WORK_BUFFER_SIZE);
 	char *buffer_pos = work_buffer;
+    bool dequeue_success = true;
 
 	ck_fifo_mpmc_entry_t *garbage;
 	bam_data_t *deserialize_entry;
 
 	while (ck_pr_load_int(&reader_running) || CK_FIFO_MPMC_ISEMPTY(deserialize_q) == false) {
-		while (ck_fifo_mpmc_trydequeue(deserialize_q, &deserialize_entry, &garbage) == true) {
+        pthread_mutex_lock(&deserialize_q_lock);
+		dequeue_success = ck_fifo_mpmc_trydequeue(deserialize_q, &deserialize_entry, &garbage);
+        pthread_mutex_unlock(&deserialize_q_lock);
+
+        if (dequeue_success == true) {
 			buffer_pos = work_buffer;
 
 			write_entry_t *w_entry = malloc(sizeof(write_entry_t));
@@ -128,7 +135,7 @@ deserialize_func(void *arg)
 			free(deserialize_entry);
 		}
 
-		usleep(100);
+		usleep(10);
 	}
 
 	ck_pr_dec_int(&deserialize_running);
@@ -337,8 +344,10 @@ convert_to_lmdb(samFile *input_file, char *db_name)
 		entry->voffset = bgzf_tell(input_file->fp.bgzf);
 		r = sam_read1(input_file, header, entry->bam_row);
 		if (r >= 0) {
+            pthread_mutex_lock(&deserialize_q_lock);
 			ck_fifo_mpmc_enqueue(deserialize_q, fifo_entry, entry);
 			ck_pr_inc_int(&deserialize_queue_size);
+            pthread_mutex_unlock(&deserialize_q_lock);
 		}
 	}
 	ck_pr_dec_int(&reader_running);
