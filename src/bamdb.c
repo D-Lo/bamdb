@@ -198,59 +198,6 @@ print_bam_row(const bam1_t *row, const bam_hdr_t *header, char *work_buffer)
 }
 
 
-static int
-read_file(samFile *input_file, offset_list_t *offset_list)
-{
-	bam_hdr_t *header = NULL;
-	bam1_t *bam_row;
-	char *work_buffer = NULL;
-	int r = 0;
-	int rc = 0;
-	int64_t src = 0;
-	offset_node_t *offset_node;
-
-	header = sam_hdr_read(input_file);
-	if (header == NULL) {
-		fprintf(stderr, "Unable to read the header from %s\n", input_file->fn);
-		rc = 1;
-		return 1;
-	}
-
-	bam_row = bam_init1();
-	work_buffer = malloc(WORK_BUFFER_SIZE);
-	if (offset_list != NULL) {
-		offset_node = offset_list->head;
-		while (offset_node != NULL) {
-			src = bgzf_seek(input_file->fp.bgzf, offset_node->offset, SEEK_SET);
-			if (src != 0) {
-				fprintf(stderr, "Error seeking to file offset\n");
-				rc = 1;
-				goto exit;
-			}
-
-			r = sam_read1(input_file, header, bam_row);
-			print_bam_row(bam_row, header, work_buffer);
-			offset_node = offset_node->next;
-		}
-	} else {
-		while ((r = sam_read1(input_file, header, bam_row)) >= 0) { // read one alignment from `in'
-			print_bam_row(bam_row, header, work_buffer);
-		}
-
-	}
-	if (r < -1) {
-		fprintf(stderr, "Attempting to process truncated file.\n");
-		rc = 1;
-		goto exit;
-	}
-
-exit:
-	free(work_buffer);
-	bam_destroy1(bam_row);
-	return rc;
-}
-
-
 int
 write_row_subset(char *input_file_name, offset_list_t *offset_list, char *out_filename)
 {
