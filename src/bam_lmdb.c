@@ -29,6 +29,8 @@
 enum lmdb_keys {
 	LMDB_QNAME = 0,
 	LMDB_BX,
+	LMDB_CB, 
+	LDMB_UB,
 	LMDB_MAX
 };
 
@@ -250,7 +252,7 @@ writer_func(void *arg)
 }
 
 int
-convert_to_lmdb(samFile *input_file, char *db_name)
+convert_to_lmdb_wgs(samFile *input_file, char *db_name)
 {
 	MDB_env *env;
 	int rc;

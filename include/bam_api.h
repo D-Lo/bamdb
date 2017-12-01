@@ -13,9 +13,8 @@ char *bam_cigar_str(const bam1_t *row, char *work_buffer);
 char *bam_seq_str(const bam1_t *row, char *work_buffer);
 char *bam_qual_str(const bam1_t *row, char *work_buffer);
 char *bam_bx_str(const bam1_t *row, char *work_buffer);
-
-// char *bam_qname_str(const bam1_t *row, char *work_buffer);
-// char *bam_ux_str(const bam1_t *row, char *work_buffer);
+char *bam_cb_str(const bam1_t *row, char *work_buffer);
+char *bam_ub_str(const bam1_t *row, char *work_buffer);
 
 
 /* TODO: the intention with this is to create some sort of representation
