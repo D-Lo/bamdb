@@ -58,20 +58,20 @@ generate_index_wgs (char *input_file_name, char *output_file_name)
 		return 1;
 	}
 
-	return convert_to_lmdb(input_file, output_file_name);   // this should work for QNAME & BX
+	return convert_to_lmdb_wgs(input_file, output_file_name);   // this should work for QNAME & BX
 }
 
 int 
 generate_index_ss (char *input_file_name, char *output_file_name)
 {
-	samFile *input_file = 0;
+	samFile *input_file = 0;                                              // these checks also exit in bam_lmdb.c  REMOVE? 
 
-	if ((input_file = sam_open(input_file_name, "r")) == 0) {
+	if ((input_file = sam_open(input_file_name, "r")) == 0) {               // these checks also exit in bam_lmdb.c  REMOVE? 
 		fprintf(stderr, "Unable to open file %s\n", input_file_name);
 		return 1;
 	}
 
-	return convert_to_lmdb(input_file, output_file_name);   // this should WILL NOT work, must replace `convert_to_lmdb()` for QNAME, CB, UB
+	return convert_to_lmdb_ss(input_file, output_file_name);   // this should WILL NOT work, must replace `convert_to_lmdb()` for QNAME, CB, UB
 }
 
 
