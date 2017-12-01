@@ -3,21 +3,10 @@
 
 #define MAX_FILENAME 1024
 
-enum bamdb_convert_to {
-	BAMDB_CONVERT_TO_TEXT,
-	BAMDB_CONVERT_TO_SQLITE,
-	BAMDB_CONVERT_TO_LMDB
-};
+const char* bamdb_version(void);
+const char* htslib_version(void);
 
-typedef struct bamdb_args {
-	enum bamdb_convert_to convert_to;
-	char input_file_name[MAX_FILENAME];
-	char *index_file_name;
-	char *output_file_name;
-	char *bx;
-} bam_args_t;
-
-int generate_index_file(char *input_file_name, char *output_file_name);
-void print_bam_rows(char *bx, char *bam_file_name, char *index_file);
+int generate_index_wgs(char *input_file_name, char *output_file_name);
+int generate_index_ss(char *input_file_name, char *output_file_name);
 
 #endif

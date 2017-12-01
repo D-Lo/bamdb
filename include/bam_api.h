@@ -12,8 +12,11 @@ const char *bam_get_rnext(const bam1_t *row, const bam_hdr_t *header);
 char *bam_cigar_str(const bam1_t *row, char *work_buffer);
 char *bam_seq_str(const bam1_t *row, char *work_buffer);
 char *bam_qual_str(const bam1_t *row, char *work_buffer);
-
 char *bam_bx_str(const bam1_t *row, char *work_buffer);
+
+// char *bam_qname_str(const bam1_t *row, char *work_buffer);
+// char *bam_ux_str(const bam1_t *row, char *work_buffer);
+
 
 /* TODO: the intention with this is to create some sort of representation
  * that we can load into something like a pandas data frame */
