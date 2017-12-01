@@ -1,5 +1,10 @@
 .PHONY: clean install uninstall
 
+HTSLIB_DIR := ./htslib-1.5
+
+
+ABS_HTSLIB_DIR := $(realpath $(HTSLIB_DIR))
+
 CC		= clang
 CFLAGS	= -Wall -g -std=gnu99 -fPIC
 LDFLAGS = -shared
@@ -13,7 +18,7 @@ TARGET   = bamdb
 ALIB     = libbamdb.a
 SLIB     = libbamdb.so
 INC_LIBS = -lhts -lm -llmdb -lpthread
-INC      = -I $(INCLUDE_DIR)
+INC      = -I $(INCLUDE_DIR) -I${ABS_HTSLIB_DIR}/htslib
 
 OBJECTS = $(patsubst %.c, %.o, $(wildcard $(SRC_DIR)/*.c))
 HEADERS = $(wildcard $(INCLUDE_DIR)/*.h)
