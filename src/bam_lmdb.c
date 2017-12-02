@@ -26,7 +26,7 @@
 #define MAX_DESERIALIZE_QUEUE_SIZE 16384
 #define MAX_WRITE_QUEUE_SIZE 16384
 
-enum lmdb_keys {
+enum lmdb_keys {         // CURRENLTY NOT USED 
 	LMDB_QNAME = 0,
 	LMDB_BX,
 	LMDB_CB, 
@@ -39,11 +39,20 @@ typedef struct _bam_data {
 	int64_t voffset;
 } bam_data_t;
 
-typedef struct write_entry {
+typedef struct write_entry_wgs {                 // WGS only 
 	char *qname;
 	char *bx;
 	int64_t voffset;
-} write_entry_t;
+} write_entry_wgs_t;
+
+
+typedef struct write_entry_ss {                 // ss only 
+	char *qname;
+	char *cb;
+	char *ub;
+	int64_t voffset;
+} write_entry_wgs_t;
+
 
 typedef struct _deserialize_thread_data {
 	bam_hdr_t *header;
@@ -54,10 +63,17 @@ typedef struct _writer_thread_data {
 	ck_fifo_mpmc_t *write_q;
 } writer_thread_data_t;
 
-static const char *lmdb_key_names[LMDB_MAX] = {
+static const char *lmdb_key_names_wgs[LMDB_MAX] = {          // WGS only    -- passing (optional)  arbitrary tags? 
 	"qname",
 	"bx"
 };
+
+static const char *lmdb_key_names_wgs[LMDB_MAX] = {          // ss only    -- passing (optional)  arbitrary tags? 
+	"qname",
+	"cb",
+	"ub"
+};
+
 
 ck_fifo_mpmc_t *deserialize_q;
 ck_fifo_mpmc_t *write_q;
@@ -97,8 +113,9 @@ commit_transaction(MDB_txn *txn)
 }
 
 
+// Not sure how this would be changed for `index single-cell BAMs (QNAME, CB, UB) with arbitrary tags
 static void *
-deserialize_func(void *arg)
+deserialize_func_ss(void *arg)          /// ss only , c.f. convert_to_lmdb_ss()
 {
     (void) arg;
 	char *work_buffer = malloc(WORK_BUFFER_SIZE);
@@ -111,7 +128,50 @@ deserialize_func(void *arg)
 		while (ck_fifo_mpmc_trydequeue(deserialize_q, &deserialize_entry, &garbage) == true) {
 			buffer_pos = work_buffer;
 
-			write_entry_t *w_entry = malloc(sizeof(write_entry_t));
+			write_entry_wgs_t *w_entry = malloc(sizeof(write_entry_wgs_t));
+			ck_fifo_mpmc_entry_t *fifo_entry = malloc(sizeof(ck_fifo_mpmc_entry_t));
+			w_entry->qname = strdup(bam_get_qname(deserialize_entry->bam_row));
+			w_entry->cb = strdup(bam_cb_str(deserialize_entry->bam_row, buffer_pos));
+			w_entry->ub = strdup(bam_ub_str(deserialize_entry->bam_row, buffer_pos));
+			w_entry->voffset = deserialize_entry->voffset;
+
+			ck_fifo_mpmc_enqueue(write_q, fifo_entry, w_entry);
+			ck_pr_inc_int(&write_queue_size);
+			ck_pr_dec_int(&deserialize_queue_size);
+
+			while (ck_pr_load_int(&write_queue_size) > MAX_WRITE_QUEUE_SIZE) {
+				usleep(100);
+			}
+
+			bam_destroy1(deserialize_entry->bam_row);
+			free(garbage);
+			free(deserialize_entry);
+		}
+
+		usleep(100);
+	}
+
+	ck_pr_dec_int(&deserialize_running);
+	pthread_exit(NULL);
+}
+
+
+// Not sure how this would be changed for `index WGS BAMs (QNAME & BX) with arbitrary tags
+static void *
+deserialize_func_wgs(void *arg)          /// WGS only , c.f. convert_to_lmdb_wgs()
+{
+    (void) arg;
+	char *work_buffer = malloc(WORK_BUFFER_SIZE);
+	char *buffer_pos = work_buffer;
+
+	ck_fifo_mpmc_entry_t *garbage;
+	bam_data_t *deserialize_entry;
+
+	while (ck_pr_load_int(&reader_running) || CK_FIFO_MPMC_ISEMPTY(deserialize_q) == false) {
+		while (ck_fifo_mpmc_trydequeue(deserialize_q, &deserialize_entry, &garbage) == true) {
+			buffer_pos = work_buffer;
+
+			write_entry_wgs_t *w_entry = malloc(sizeof(write_entry_wgs_t));
 			ck_fifo_mpmc_entry_t *fifo_entry = malloc(sizeof(ck_fifo_mpmc_entry_t));
 			w_entry->qname = strdup(bam_get_qname(deserialize_entry->bam_row));
 			w_entry->bx = strdup(bam_bx_str(deserialize_entry->bam_row, buffer_pos));
@@ -138,8 +198,12 @@ deserialize_func(void *arg)
 }
 
 
+
+// writer_func_wgs() written for one tag, BX ---  not clear how to do this for both CB and UB for convert_to_lmdb(), c.f.
+//      rc = pthread_create(&threads[DESERIALIZE_THREAD_COUNT], NULL, writer_func, &writer_thread_args);
+
 static void *
-writer_func(void *arg)
+writer_func_wgs(void *arg)                      // WGS only 
 {
 	writer_thread_data_t *data = (writer_thread_data_t *)arg;
 
@@ -150,7 +214,7 @@ writer_func(void *arg)
 	uint64_t n = 0;
 	int rc;
 
-	write_entry_t *entry;
+	write_entry_wgs_t *entry;             // WGS only 
 	ck_fifo_mpmc_entry_t *garbage;
 
 	uint64_t mapsize = LMDB_INIT_MAPSIZE;
@@ -219,7 +283,7 @@ writer_func(void *arg)
 					return NULL;
 				}
 
-				rc = mdb_dbi_open(txn, lmdb_key_names[LMDB_BX], MDB_DUPSORT | MDB_DUPFIXED, &dbi[LMDB_BX]);
+				rc = mdb_dbi_open(txn, lmdb_key_names_wgs[LMDB_BX], MDB_DUPSORT | MDB_DUPFIXED, &dbi[LMDB_BX]);  // WGS only
 				if (rc != MDB_SUCCESS) {
 					fprintf(stderr, "Error opening database: %s\n", mdb_strerror(rc));
 					return NULL;
@@ -311,7 +375,7 @@ convert_to_lmdb_wgs(samFile *input_file, char *db_name)
 	for (size_t i = 0; i < DESERIALIZE_THREAD_COUNT; i++) {
 		deserialize_thread_data_t deserialize_thread_args;
 		deserialize_thread_args.header = header;
-		rc = pthread_create(&threads[i], NULL, deserialize_func, &deserialize_thread_args);
+		rc = pthread_create(&threads[i], NULL, deserialize_func_wgs, &deserialize_thread_args);   // WGS only 
 		if (rc != 0) {
 			fprintf(stderr, "Received non-zero return code when launching deserialize thread: %d\n", rc);
 			ret = 1;

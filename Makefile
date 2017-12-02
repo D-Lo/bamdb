@@ -2,7 +2,6 @@
 
 HTSLIB_DIR := ./htslib-1.5
 
-
 ABS_HTSLIB_DIR := $(realpath $(HTSLIB_DIR))
 
 CC		= clang
