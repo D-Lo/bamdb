@@ -18,6 +18,7 @@ typedef struct bamdb_args {
 } bam_args_t;
 
 int generate_index_file(char *input_file_name, char *output_file_name);
-void print_bam_rows(char *bx, char *bam_file_name, char *index_file);
+void print_bx_rows(char **input_file_name, char **db_path, char **bx);
+
 
 #endif

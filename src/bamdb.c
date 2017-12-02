@@ -384,13 +384,13 @@ main(int argc, char *argv[]) {
 			/* Print rows in tab delim format */
 			bam_row_set_t *row_set = get_bx_rows(bam_args.input_file_name, bam_args.index_file_name, bam_args.bx);
 
-            if (row_set != NULL) {
-                for (size_t j = 0; j < row_set->n_entries; ++j) {
-                    print_sequence_row(row_set->rows[j]);
+			if (row_set != NULL) {
+                            for (size_t j = 0; j < row_set->n_entries; ++j) {
+            	                print_sequence_row(row_set->rows[j]);
+                            }
+                            free_row_set(row_set);
+                        }
                 }
-                free_row_set(row_set);
-            }
-		}
 	}
 
 	if (bam_args.convert_to == BAMDB_CONVERT_TO_LMDB) {
@@ -400,3 +400,17 @@ main(int argc, char *argv[]) {
 	return rc;
 }
 
+
+void
+print_bx_rows(char **input_file_name, char **db_path, char **bx)
+{
+    bam_row_set_t *row_set = get_bx_rows(*input_file_name, *db_path, *bx);
+
+    if (row_set != NULL) {
+        for (size_t j = 0; j < row_set->n_entries; ++j) {
+            print_sequence_row(row_set->rows[j]);
+        }
+        free_row_set(row_set);
+    }
+
+}
