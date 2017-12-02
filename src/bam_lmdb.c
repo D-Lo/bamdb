@@ -29,6 +29,8 @@
 enum lmdb_keys {
 	LMDB_QNAME = 0,
 	LMDB_BX,
+	LMDB_CB, 
+	LDMB_UB,
 	LMDB_MAX
 };
 
@@ -250,7 +252,7 @@ writer_func(void *arg)
 }
 
 int
-convert_to_lmdb(samFile *input_file, char *db_name)
+convert_to_lmdb_wgs(samFile *input_file, char *db_name)
 {
 	MDB_env *env;
 	int rc;
@@ -459,6 +461,95 @@ get_bx_rows(char *input_file_name, char *db_path, char *bx)
 
 	offset_list = calloc(1, sizeof(offset_list_t));
 	n_rows = get_offsets(offset_list, db_path, bx);
+	if (n_rows <= 0) {
+		return NULL;
+	}
+
+	row_set = malloc(sizeof(bam_row_set_t));
+	row_set->n_entries = n_rows;
+	row_set->rows = malloc(n_rows * sizeof(bam_row_set_t));
+
+	offset_node = offset_list->head;
+	while (offset_node != NULL) {
+		/* TODO: make sure we don't overrun row_set */
+		row_set->rows[i] = get_bam_row(offset_node->offset, input_file, header);
+		offset_node = offset_node->next;
+		i++;
+	}
+
+	return row_set;
+}
+
+
+bam_row_set_t *
+get_cb_rows(char *input_file_name, char *db_path, char *cb)
+{
+	samFile *input_file = 0;
+	bam_hdr_t *header = NULL;
+	int n_rows = 0;
+	offset_list_t *offset_list = NULL;
+	offset_node_t *offset_node;
+	bam_row_set_t *row_set = NULL;
+	int i = 0;
+
+	if ((input_file = sam_open(input_file_name, "r")) == 0) {
+		fprintf(stderr, "Unable to open file %s\n", input_file_name);
+		return NULL;
+	}
+
+	header = sam_hdr_read(input_file);
+	if (header == NULL) {
+		fprintf(stderr, "Unable to read the header from %s\n", input_file->fn);
+		return NULL;
+	}
+
+	offset_list = calloc(1, sizeof(offset_list_t));
+	n_rows = get_offsets(offset_list, db_path, cb);
+	if (n_rows <= 0) {
+		return NULL;
+	}
+
+	row_set = malloc(sizeof(bam_row_set_t));
+	row_set->n_entries = n_rows;
+	row_set->rows = malloc(n_rows * sizeof(bam_row_set_t));
+
+	offset_node = offset_list->head;
+	while (offset_node != NULL) {
+		/* TODO: make sure we don't overrun row_set */
+		row_set->rows[i] = get_bam_row(offset_node->offset, input_file, header);
+		offset_node = offset_node->next;
+		i++;
+	}
+
+	return row_set;
+}
+
+
+
+bam_row_set_t *
+get_ub_rows(char *input_file_name, char *db_path, char *ub)
+{
+	samFile *input_file = 0;
+	bam_hdr_t *header = NULL;
+	int n_rows = 0;
+	offset_list_t *offset_list = NULL;
+	offset_node_t *offset_node;
+	bam_row_set_t *row_set = NULL;
+	int i = 0;
+
+	if ((input_file = sam_open(input_file_name, "r")) == 0) {
+		fprintf(stderr, "Unable to open file %s\n", input_file_name);
+		return NULL;
+	}
+
+	header = sam_hdr_read(input_file);
+	if (header == NULL) {
+		fprintf(stderr, "Unable to read the header from %s\n", input_file->fn);
+		return NULL;
+	}
+
+	offset_list = calloc(1, sizeof(offset_list_t));
+	n_rows = get_offsets(offset_list, db_path, ub);
 	if (n_rows <= 0) {
 		return NULL;
 	}

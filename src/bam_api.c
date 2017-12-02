@@ -149,6 +149,74 @@ bam_bx_str(const bam1_t *row, char *work_buffer)
 	return ret;
 }
 
+char *
+bam_cb_str(const bam1_t *row, char *work_buffer)
+{
+	/* CBZ shouldn't appear for any other purposes in the aux field  */
+	uint8_t *aux;
+	char *ret = work_buffer;
+	uint8_t *cb_pos = 0;
+
+	aux = bam_get_aux(row);
+
+	while (aux+4 <= row->data + row->l_data) {
+		if (aux[0] == 'C' && aux[1] == 'B' && aux[2] == 'Z') {
+			cb_pos = aux + 3;
+			break;
+		}
+		aux++;
+	}
+
+	if (cb_pos != NULL) {
+		ret = work_buffer;
+		while (cb_pos < row->data + row->l_data && *bx_pos) {
+			sprintf(work_buffer, "%c", *cb_pos++);
+			work_buffer++;
+		}
+	} else {
+		work_buffer[0] = '*';
+		work_buffer[1] = '\0';
+		work_buffer += 2;
+	}
+
+	return ret;
+}
+
+
+char *
+bam_ub_str(const bam1_t *row, char *work_buffer)
+{
+	/* UBZ shouldn't appear for any other purposes in the aux field  */
+	uint8_t *aux;
+	char *ret = work_buffer;
+	uint8_t *ub_pos = 0;
+
+	aux = bam_get_aux(row);
+
+	while (aux+4 <= row->data + row->l_data) {
+		if (aux[0] == 'U' && aux[1] == 'B' && aux[2] == 'Z') {
+			ub_pos = aux + 3;
+			break;
+		}
+		aux++;
+	}
+
+	if (ub_pos != NULL) {
+		ret = work_buffer;
+		while (bx_pos < row->data + row->l_data && *bx_pos) {
+			sprintf(work_buffer, "%c", *ub_pos++);
+			work_buffer++;
+		}
+	} else {
+		work_buffer[0] = '*';
+		work_buffer[1] = '\0';
+		work_buffer += 2;
+	}
+
+	return ret;
+}
+
+
 
 bam_sequence_row_t *
 deserialize_bam_row(const bam1_t *row, const bam_hdr_t *header)
