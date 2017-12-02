@@ -152,7 +152,7 @@ bam_bx_str(const bam1_t *row, char *work_buffer)
 char *
 bam_cb_str(const bam1_t *row, char *work_buffer)
 {
-	/* XXX: Hoping that CBZ doesn't appear for any other purposes in the aux field */
+	/* CBZ shouldn't appear for any other purposes in the aux field  */
 	uint8_t *aux;
 	char *ret = work_buffer;
 	uint8_t *cb_pos = 0;
@@ -186,7 +186,7 @@ bam_cb_str(const bam1_t *row, char *work_buffer)
 char *
 bam_ub_str(const bam1_t *row, char *work_buffer)
 {
-	/* XXX: Hoping that UBZ doesn't appear for any other purposes in the aux field */
+	/* UBZ shouldn't appear for any other purposes in the aux field  */
 	uint8_t *aux;
 	char *ret = work_buffer;
 	uint8_t *ub_pos = 0;

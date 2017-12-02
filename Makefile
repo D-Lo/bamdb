@@ -37,8 +37,7 @@ $(ALIB): $(BUILT_OBJECTS)
 
 $(SLIB): $(BUILT_OBJECTS)
 	$(CC) $(CFLAGS) $(INC_LIBS) -o $(SLIB) $(BUILT_OBJECTS)
-
-# clang -Wall -g -std=gnu99 -fPIC -lhts -lm -llmdb -lpthread -o build/libbamdb.so  build/bam_lmdb.o  build/bam_api.o  build/bamdb.o
+	clang -Wall -g -std=gnu99 -fPIC -lhts -lm -llmdb -lpthread -o build/libbamdb.so  build/bam_lmdb.o  build/bam_api.o  build/bamdb.o -shared
 
 install: $(ALIB) $(SLIB)
 	mkdir -p $(DESTDIR)$(PREFIX)/lib

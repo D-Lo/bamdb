@@ -431,6 +431,13 @@ get_offsets(offset_list_t *offset_list, const char *lmdb_db_name, const char *bx
 
 
 bam_row_set_t *
+get_bx_rows_wrapped(char **input_file_name, char **db_path, char **bx)
+{
+	return get_bx_rows(*input_file_name, *db_path, *bx);
+}
+
+
+bam_row_set_t *
 get_bx_rows(char *input_file_name, char *db_path, char *bx)
 {
 	samFile *input_file = 0;

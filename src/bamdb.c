@@ -79,11 +79,17 @@ generate_index_ss (char *input_file_name, char *output_file_name)
 
 int 
 main(int argc, char *argv[]){
-
 	if (argc < 2) { usage(stderr); return 1; }
 	if (strcmp(argv[1], "help") == 0 || strcmp(argv[1], "--help") == 0){
 		usage(stdout); 
 		return 0;
+			if (row_set != NULL) {
+                            for (size_t j = 0; j < row_set->n_entries; ++j) {
+            	                print_sequence_row(row_set->rows[j]);
+                            }
+                            free_row_set(row_set);
+                        }
+                }
 	}
 
 	int rc = 0;
