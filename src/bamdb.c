@@ -69,9 +69,9 @@ generate_index_wgs (char *input_file_name, char *output_file_name)
 int 
 generate_index_ss (char *input_file_name, char *output_file_name)
 {
-	samFile *input_file = 0;                                              // these checks also exit in bam_lmdb.c  REMOVE? 
+	samFile *input_file = 0;                           // these checks also exit in bam_lmdb.c  REMOVE?
 
-	if ((input_file = sam_open(input_file_name, "r")) == 0) {               // these checks also exit in bam_lmdb.c  REMOVE? 
+	if ((input_file = sam_open(input_file_name, "r")) == 0) {     // these checks also exit in bam_lmdb.c  REMOVE?
 		fprintf(stderr, "Unable to open file %s\n", input_file_name);
 		return 1;
 	}
@@ -88,7 +88,7 @@ main(int argc, char *argv[]){
 
 	int rc = 0;
 	int c;
-
+    
     int optional_tags = 0;
 	char tagArray[MAXTAGCOUNT][MAXTAGNAME+1];  // store arbitrary BAM tags into char array `tagArray`
 
