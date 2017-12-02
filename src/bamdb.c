@@ -19,6 +19,9 @@
 #define BAMDBVERSION "1.0"
 #define HTSLIBVERSION "1.5"
 
+// should use malloc() and realoc() for dynamic allocation
+#define MAXTAGNAME 10 
+#define MAXTAGCOUNT 10
 
 
 const 
@@ -38,11 +41,13 @@ static void usage(FILE *fp){
 "Program: bamdb (Software for indexing and querying 10x BAMs)\n"
 "Version: %s (using htslib %s)\n\n", bamdb_version(), htslib_version());
     fprintf(fp,
-"Usage:   bamdb index <required-flag>\n"
+"Usage:   bamdb index <required-flag> [BAM] [-tag STR]\n"
 "\n"
 "Required flags:\n"
-"  WGS            index QNAME and BX tags for 10x WGS BAM\n"
-"  single-cell    index QNAME, CB, and UB tags for single-cell BAM\n"
+"  WGS            Index QNAME and BX tags for 10x WGS BAM\n"
+"  single-cell    Index QNAME, CB, and UB tags for single-cell BAM\n"
+"Options:\n"
+"  -tag           Generate index custom index for BAM\n"  
 "\n");
 
 
@@ -77,8 +82,16 @@ generate_index_ss (char *input_file_name, char *output_file_name)
 
 
 
+
 int 
 main(int argc, char *argv[]){
+
+	int rc = 0;
+	int c;
+
+    int optional_tags = 0;
+	char tagArray[MAXTAGCOUNT][MAXTAGNAME+1];  // store arbitrary BAM tags into char array `tagArray`
+
 	if (argc < 2) { usage(stderr); return 1; }
 	if (strcmp(argv[1], "help") == 0 || strcmp(argv[1], "--help") == 0){
 		usage(stdout); 
@@ -92,9 +105,8 @@ main(int argc, char *argv[]){
                 }
 	}
 
-	int rc = 0;
 	if (strcmp(argv[1], "index WGS") == 0 || strcmp(argv[1], "index --WGS") == 0)                         rc = generate_index_wgs(argc-1, argv+1);   // QNAME, BX
-	else if (strcmp(argv[1], "index signle-cell") == 0 || strcmp(argv[1], "index --single-cell") == 0)    rc = generate_index_ss(argc-1, argv+1);    // QNAME, CB, UB
+	else if (strcmp(argv[1], "index single-cell") == 0 || strcmp(argv[1], "index --single-cell") == 0)    rc = generate_index_ss(argc-1, argv+1);    // QNAME, CB, UB
 
 	else if (strcmp(argv[1], "version") == 0 || strcmp(argv[1], "--version") == 0){
         printf(
@@ -106,7 +118,26 @@ main(int argc, char *argv[]){
         fprintf(stderr, "[main] unrecognized command '%s'\n", argv[1]);
         return 1;
     }
+  
+    static const struct option loptions[] = {
+		{"tag", required_argument, NULL, 't'}, 
+		{NULL, 0, NULL, 0}
+	};   
 
+    
+    while ( (c = getopt(argc, argv, "t:", loptions, NULL))>0 ) {   
+    	switch(c) {
+    		case 't':
+    		if (optarg == NULL){
+    			extra_tag = NULL;
+    		} 
+    		else{
+    		    // strcpy(extra_tag, optarg); -- not for an array
+                snprintf(tryArray[optional_tags++], MAXTAGNAME, "%s", optarg);
+    		    break;
+    		}
+        }
+    }
 
 	return rc;
 }
