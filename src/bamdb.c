@@ -14,7 +14,8 @@
 #include "bam_lmdb.h"
 #include "bam_api.h"
 
-#define get_int_chars(i) ((i == 0) ? 1 : floor(log10(abs(i))) + 1)
+// Return number of characters an unsigned int takes when represented in base 10
+#define get_int_chars(i) ((i == 0) ? 1 : floor(log10(i)) + 1)
 
 
 static void
@@ -186,7 +187,7 @@ print_bam_row(const bam1_t *row, const bam_hdr_t *header, char *work_buffer)
 	printf("\tQUAL: %s\n", bam_qual_str(row, work_buffer));
 	work_buffer = temp;
 
-	printf("\tBX: %s\n", bam_bx_str(row, work_buffer));
+	printf("\tBX: %s\n", bam_str_key(row, "BX", work_buffer));
 	work_buffer = temp;
 
 	/* TAGs */
@@ -313,13 +314,21 @@ int
 generate_index_file (char *input_file_name, char *output_file_name)
 {
 	samFile *input_file = 0;
+	indices_t target_indices = {
+	    .includes_qname = false,
+	    .num_key_indices = 1,
+	    .key_indices = malloc(sizeof(char *))
+	};
+
+	target_indices.key_indices[0] = malloc(3);
+	strncpy(target_indices.key_indices[0], "BX", 2);
 
 	if ((input_file = sam_open(input_file_name, "r")) == 0) {
 		fprintf(stderr, "Unable to open file %s\n", input_file_name);
 		return 1;
 	}
 
-	return convert_to_lmdb(input_file, output_file_name);
+	return convert_to_lmdb(input_file, output_file_name, &target_indices);
 }
 
 
@@ -377,7 +386,7 @@ main(int argc, char *argv[]) {
 			/* Write resulting rows to file */
 			offset_list_t *offset_list = calloc(1, sizeof(offset_list_t));
 
-			rc = get_offsets(offset_list, bam_args.index_file_name, bam_args.bx);
+			rc = get_offsets(offset_list, "BX", bam_args.index_file_name, bam_args.bx);
 			rc = write_row_subset(bam_args.input_file_name, offset_list, bam_args.output_file_name);
 			free(offset_list);
 		} else {
@@ -385,12 +394,12 @@ main(int argc, char *argv[]) {
 			bam_row_set_t *row_set = get_bx_rows(bam_args.input_file_name, bam_args.index_file_name, bam_args.bx);
 
 			if (row_set != NULL) {
-                            for (size_t j = 0; j < row_set->n_entries; ++j) {
-            	                print_sequence_row(row_set->rows[j]);
-                            }
-                            free_row_set(row_set);
-                        }
-                }
+			    for (size_t j = 0; j < row_set->n_entries; ++j) {
+	    			print_sequence_row(row_set->rows[j]);
+			    }
+			    free_row_set(row_set);
+			}
+		}
 	}
 
 	if (bam_args.convert_to == BAMDB_CONVERT_TO_LMDB) {
@@ -407,10 +416,10 @@ print_bx_rows(char **input_file_name, char **db_path, char **bx)
     bam_row_set_t *row_set = get_bx_rows(*input_file_name, *db_path, *bx);
 
     if (row_set != NULL) {
-        for (size_t j = 0; j < row_set->n_entries; ++j) {
-            print_sequence_row(row_set->rows[j]);
-        }
-        free_row_set(row_set);
+	for (size_t j = 0; j < row_set->n_entries; ++j) {
+	    print_sequence_row(row_set->rows[j]);
+	}
+	free_row_set(row_set);
     }
 
 }

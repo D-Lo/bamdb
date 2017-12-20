@@ -7,13 +7,20 @@
 const char *bam_get_rname(const bam1_t *row, const bam_hdr_t *header);
 const char *bam_get_rnext(const bam1_t *row, const bam_hdr_t *header);
 
-/* Return pointer to beginning of formatted string in work_buffer,
- * advance work_buffer to the element after the formatted string */
+/**
+ * Return pointer to beginning of formatted string in work_buffer,
+ * advance work_buffer to the element after the formatted string 
+ */
 char *bam_cigar_str(const bam1_t *row, char *work_buffer);
 char *bam_seq_str(const bam1_t *row, char *work_buffer);
 char *bam_qual_str(const bam1_t *row, char *work_buffer);
 
-char *bam_bx_str(const bam1_t *row, char *work_buffer);
+/**
+ * Return the value associated with an optional string key on a BAM row.
+ * This will advance the work buffer to the elemt after the value.
+ * Returns a default value of '*' if they key is not found.
+ */
+char *bam_str_key(const bam1_t *row, const char* key, char *work_buffer);
 
 /* TODO: the intention with this is to create some sort of representation
  * that we can load into something like a pandas data frame */
