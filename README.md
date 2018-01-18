@@ -12,8 +12,8 @@
 
 e.g. create bamdb index for WGS on BX and QNAME field
 
-bamdb index WGS example.bam
+    bamdb index WGS example.bam
 
 e.g. create bamdb index for WGS on BX and QNAME field, and also MD and 
 
-bamdb index WGS example.bam  --tag=MD --tag=BZ
+    bamdb index WGS example.bam  --tag=MD --tag=BZ
