@@ -117,21 +117,26 @@ bam_qual_str(const bam1_t *row, char *work_buffer)
 
 
 char *
-bam_bx_str(const bam1_t *row, char *work_buffer)
+bam_str_key(const bam1_t *row, const char* key, char *work_buffer)
 {
-	/* XXX: Hoping that BXZ doesn't appear for any other purposes in the aux field */
 	uint8_t *aux;
 	char *ret = work_buffer;
 	uint8_t *bx_pos = 0;
 
 	aux = bam_get_aux(row);
 
-	while (aux+4 <= row->data + row->l_data) {
-		if (aux[0] == 'B' && aux[1] == 'X' && aux[2] == 'Z') {
-			bx_pos = aux + 3;
-			break;
+	if (strlen(key) == 2) {
+		while (aux+4 <= row->data + row->l_data) {
+			/* Format for string keys is **Z, Z being a format signifer */
+			if (aux[0] == key[0] && aux[1] == key[1] && aux[2] == 'Z') {
+				bx_pos = aux + 3;
+				break;
+			}
+			aux++;
 		}
-		aux++;
+	} else {
+		fprintf(stderr, "Attempting to access a key (%s) that is not 2 characters long\n", key);
+		return ret;
 	}
 
 	if (bx_pos != NULL) {
