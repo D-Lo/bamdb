@@ -315,7 +315,7 @@ generate_index_file (char *input_file_name, char *output_file_name)
 {
 	samFile *input_file = 0;
 	indices_t target_indices = {
-	    .includes_qname = false,
+	    .includes_qname = true,
 	    .num_key_indices = 1,
 	    .key_indices = malloc(sizeof(char *))
 	};
