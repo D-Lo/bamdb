@@ -31,6 +31,8 @@ set_target_properties(libbamdb PROPERTIES OUTPUT_NAME "bamdb")
 
 # Default install path. Can be overridden with DESTDIR
 install(TARGETS bamdb RUNTIME DESTINATION bin)
+install(DIRECTORY include/
+  DESTINATION include/bamdb) 
 install(TARGETS libbamdb
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib)

@@ -26,8 +26,6 @@ indices_t *get_available_indices(const char *db_path);
 
 bool is_index_present(const char *db_path, const char *index_name);
 
-bam_row_set_t *get_bx_rows(char *input_file_name, char *db_path, char *bx);
-bam_row_set_t *get_bx_rows_wrapped(char **input_file_name, char **db_path, char **bx);
-
+bam_row_set_t *get_bam_rows(const char *input_file_name, const char *db_path, const char *key_type, const char *key_value);
 
 #endif

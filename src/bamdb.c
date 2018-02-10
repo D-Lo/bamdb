@@ -391,7 +391,7 @@ main(int argc, char *argv[]) {
 			free(offset_list);
 		} else {
 			/* Print rows in tab delim format */
-			bam_row_set_t *row_set = get_bx_rows(bam_args.input_file_name, bam_args.index_file_name, bam_args.bx);
+			bam_row_set_t *row_set = get_bam_rows(bam_args.input_file_name, bam_args.index_file_name, "bx", bam_args.bx);
 
 			if (row_set != NULL) {
 			    for (size_t j = 0; j < row_set->n_entries; ++j) {
@@ -413,7 +413,7 @@ main(int argc, char *argv[]) {
 void
 print_bx_rows(char **input_file_name, char **db_path, char **bx)
 {
-    bam_row_set_t *row_set = get_bx_rows(*input_file_name, *db_path, *bx);
+    bam_row_set_t *row_set = get_bam_rows(*input_file_name, *db_path, "bx", *bx);
 
     if (row_set != NULL) {
 	for (size_t j = 0; j < row_set->n_entries; ++j) {

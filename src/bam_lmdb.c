@@ -499,14 +499,7 @@ get_offsets(offset_list_t *offset_list, const char *db_path, const char *index_n
 
 
 bam_row_set_t *
-get_bx_rows_wrapped(char **input_file_name, char **db_path, char **bx)
-{
-	return get_bx_rows(*input_file_name, *db_path, *bx);
-}
-
-
-bam_row_set_t *
-get_bx_rows(char *input_file_name, char *db_path, char *bx)
+get_bam_rows(const char *input_file_name, const char *db_path, const char *key_type, const char *key_value)
 {
 	samFile *input_file = 0;
 	bam_hdr_t *header = NULL;
@@ -528,7 +521,7 @@ get_bx_rows(char *input_file_name, char *db_path, char *bx)
 	}
 
 	offset_list = calloc(1, sizeof(offset_list_t));
-	n_rows = get_offsets(offset_list, db_path, "BX", bx);
+	n_rows = get_offsets(offset_list, db_path, key_type, key_value);
 	if (n_rows <= 0) {
 		return NULL;
 	}
