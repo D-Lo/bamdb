@@ -15,10 +15,12 @@ RUN apt-get update && apt-get install -y \
 COPY src/ /bamdb/src/
 COPY include/ /bamdb/include/
 COPY CMakeLists.txt /bamdb
+COPY cmake/ /bamdb/cmake/
 WORKDIR /bamdb
 
 # Compile bamdb
+RUN cmake .
 RUN make
 
 # Run bamdb
-ENTRYPOINT ["/bamdb/build/bamdb"]
+ENTRYPOINT ["/bamdb/bamdb"]
