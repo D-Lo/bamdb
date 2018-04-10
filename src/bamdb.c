@@ -386,7 +386,7 @@ main(int argc, char *argv[]) {
 			/* Write resulting rows to file */
 			offset_list_t *offset_list = calloc(1, sizeof(offset_list_t));
 
-			rc = get_offsets(offset_list, "BX", bam_args.index_file_name, bam_args.bx);
+			rc = get_offsets(offset_list, bam_args.index_file_name, "BX", bam_args.bx);
 			rc = write_row_subset(bam_args.input_file_name, offset_list, bam_args.output_file_name);
 			free(offset_list);
 		} else {
