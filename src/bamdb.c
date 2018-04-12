@@ -49,7 +49,7 @@ get_bam_tags(const bam1_t *row, char *buffer)
 				buffer_pos += 3;
 				aux++;
 				break;
-			case 'C': /*Signed integer */
+			case 'C': /* Signed integer */
 				sprintf(buffer + buffer_pos, "i:%d", *aux);
 				buffer_pos += 2 + get_int_chars(*aux);
 				aux++;
@@ -386,12 +386,12 @@ main(int argc, char *argv[]) {
 			/* Write resulting rows to file */
 			offset_list_t *offset_list = calloc(1, sizeof(offset_list_t));
 
-			rc = get_offsets(offset_list, "BX", bam_args.index_file_name, bam_args.bx);
+			rc = get_offsets(offset_list, bam_args.index_file_name, "BX", bam_args.bx);
 			rc = write_row_subset(bam_args.input_file_name, offset_list, bam_args.output_file_name);
 			free(offset_list);
 		} else {
 			/* Print rows in tab delim format */
-			bam_row_set_t *row_set = get_bam_rows(bam_args.input_file_name, bam_args.index_file_name, "bx", bam_args.bx);
+			bam_row_set_t *row_set = get_bam_rows(bam_args.input_file_name, bam_args.index_file_name, "BX", bam_args.bx);
 
 			if (row_set != NULL) {
 			    for (size_t j = 0; j < row_set->n_entries; ++j) {

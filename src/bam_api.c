@@ -1,3 +1,4 @@
+#include <inttypes.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -155,6 +156,163 @@ bam_str_key(const bam1_t *row, const char* key, char *work_buffer)
 }
 
 
+static void
+populate_aux_tags(aux_list_t *list, const bam1_t *row)
+{
+	// XXX: do we need a working buffer?
+	/* Tags are stored as TAGTYPEVALUE
+	 * TAG is two characters
+	 * TYPE is a single character
+	 * Example: QTZAAFFFKKK which indicates a
+	 * string tag of QT with a value of AAFFFKKK */
+	uint8_t *aux;
+	uint8_t type = 0, sub_type = 0;
+	size_t aux_bytes = 0;
+	uint32_t arr_size;
+	char *dummy = 0;
+
+	list->n_tags = 0;
+	list->head = NULL;
+	list->tail = NULL;
+
+	aux = bam_get_aux(row);
+	while (aux+4 <= row->data + row->l_data) {
+		aux_elm_t *new_aux = calloc(1, sizeof(aux_elm_t));
+
+		new_aux->key[0] = aux[0];
+		new_aux->key[1] = aux[1];
+		new_aux->type = aux[2];
+		aux += 3;
+
+		/* TODO: add error handling for values that don't conform to type */
+		switch(new_aux->type) {
+			case 'A': /* Printable character */
+				new_aux->val = malloc(sizeof(char));
+				memcpy(new_aux->val, aux, 1);
+				aux++;
+				break;
+			case 'C': /* Unsigned 8 bit integer */
+				new_aux->val = malloc(sizeof(uint8_t));
+				memcpy(new_aux->val, aux, 1);
+				aux++;
+				break;
+			case 'c': /* Signed 8 bit integer */
+				new_aux->val = malloc(sizeof(int8_t));
+				memcpy(new_aux->val, aux, 1);
+				aux++;
+				break;
+			case 'S': /* Unsigned 16 bit integer */
+				new_aux->val = malloc(sizeof(uint16_t));
+				memcpy(new_aux->val, aux, 2);
+				aux += 2;
+				break;
+			case 's': /* Signed 16 bit integer */
+				new_aux->val = malloc(sizeof(int16_t));
+				memcpy(new_aux->val, aux, 2);
+				aux += 2;
+				break;
+			case 'I': /* Unsigned 32 bit integer */
+				new_aux->val = malloc(sizeof(uint32_t));
+				memcpy(new_aux->val, aux, 4);
+				aux += 4;
+				break;
+			case 'i': /* Signed 32 bit integer */
+				new_aux->val = malloc(sizeof(int32_t));
+				memcpy(new_aux->val, aux, 4);
+				aux += 4;
+				break;
+			case 'f': /* Single precision floating point */
+				new_aux->val = malloc(sizeof(float));
+				memcpy(new_aux->val, aux, 4);
+				aux += 4;
+				break;
+			case 'd':
+				/* Double precision floating point. This does appear to be in the BAM spec,
+				 * I'm copying from samtools which does provide for this */
+				new_aux->val = malloc(sizeof(float));
+				memcpy(new_aux->val, aux, 4);
+				aux += 4;
+				break;
+			case 'Z': /* Printable string */
+			case 'H': /* Byte array */
+				aux_bytes = 0;
+				/* Determine size of value */
+				while (aux < row->data + row->l_data && *(aux + aux_bytes)) {
+					aux_bytes++;
+				}
+				new_aux->val = malloc(aux_bytes);
+				memcpy(new_aux->val, aux, aux_bytes);
+				aux += aux_bytes + 1; // XXX: padding byte?
+				break;
+// TODO: Implement support for array types 
+#if 0
+			case 'B': /* Integer or numeric array */
+				sub_type = *(aux++);
+				memcpy(&arr_size, aux, 4);
+
+				sprintf(buffer + buffer_pos, "B:%c", sub_type);
+				buffer_pos += 3;
+				for (int i = 0; i < arr_size; ++i) {
+					sprintf(buffer + buffer_pos, ",");
+					buffer_pos++;
+					switch (sub_type) {
+						case 'c':
+							sprintf(buffer + buffer_pos, "%d", *aux);
+							buffer_pos += get_int_chars(*aux);
+							aux++;
+							break;
+						case 'C':
+							sprintf(buffer + buffer_pos, "%" PRId8, *(int8_t*)aux);
+							buffer_pos += get_int_chars(*aux);
+							aux++;
+							break;
+						case 'S':
+							sprintf(buffer + buffer_pos, "%" PRIu16, *(uint16_t*)aux);
+							buffer_pos += get_int_chars(*aux);
+							aux += 2;
+							break;
+						case 's':
+							sprintf(buffer + buffer_pos, "%" PRId16, *(int16_t*)aux);
+							buffer_pos += get_int_chars(*aux);
+							aux += 2;
+							break;
+						case 'I':
+							sprintf(buffer + buffer_pos, "i:%" PRIu32, *(uint32_t*)aux);
+							buffer_pos += 2 + get_int_chars(*aux);
+							aux += 4;
+							break;
+						case 'i':
+							sprintf(buffer + buffer_pos, "i:%" PRId32, *(int32_t*)aux);
+							buffer_pos += 2 + get_int_chars(*aux);
+							aux += 4;
+							break;
+						case 'f': /* Single precision floating point */
+							sprintf(buffer + buffer_pos, "f:%g", *(float*)aux);
+							/* Figure out how many chars the fp takes as a string */
+							buffer_pos += 2 + snprintf(dummy, 0, "%g", *(float*)aux);
+							aux += 4;
+							break;
+					}
+				}
+				break;
+#endif
+		}
+
+		if (list->head == NULL) {
+		    list->head = new_aux;
+		}
+
+		if (list->tail != NULL) {
+		    list->tail->next = new_aux;
+		}
+		list->tail = new_aux;
+
+		list->n_tags++;
+	}
+
+}
+
+
 bam_sequence_row_t *
 deserialize_bam_row(const bam1_t *row, const bam_hdr_t *header)
 {
@@ -175,6 +333,7 @@ deserialize_bam_row(const bam1_t *row, const bam_hdr_t *header)
 	r->seq = strdup(bam_seq_str(row, work_buffer));
 	work_buffer = temp;
 	r->qual = strdup(bam_qual_str(row, work_buffer));
+	populate_aux_tags(&r->aux_list, row);
 
 	return r;
 }
@@ -197,9 +356,19 @@ get_bam_row(int64_t offset, samFile *input_file, bam_hdr_t *header)
 }
 
 
+static void
+print_bam_tags()
+{
+
+
+}
+
+
 void
 print_sequence_row(bam_sequence_row_t *row)
 {
+	aux_elm_t *aux = row->aux_list.head;
+
 	printf("%s", row->qname);
 	printf("\t%d", row->flag);
 	printf("\t%s", row->rname);
@@ -210,7 +379,49 @@ print_sequence_row(bam_sequence_row_t *row)
 	printf("\t%d", row->pnext);
 	printf("\t%d", row->tlen);
 	printf("\t%s", row->seq);
-	printf("\t%s\n", row->qual);
+	printf("\t%s", row->qual);
+
+	while (aux != NULL) {
+		printf("\t%c%c:", aux->key[0], aux->key[1]);
+
+		switch(aux->type) {
+			case 'A':
+				printf("A:%c", *(char*)aux->val);
+				break;
+			case 'C':
+				printf("i:%d", *(int*)aux->val);
+				break;
+			case 'c':
+				printf("i:%" PRId8, *(int8_t*)aux->val);
+				break;
+			case 'S':
+				printf("i:%" PRIu16, *(uint16_t*)aux->val);
+				break;
+			case 's':
+				printf("i:%" PRId16, *(int16_t*)aux->val);
+				break;
+			case 'I':
+				printf("i:%" PRIu32, *(uint32_t*)aux->val);
+				break;
+			case 'i':
+				printf("i:%" PRId32, *(int32_t*)aux->val);
+				break;
+			case 'f':
+				printf("f:%g", *(float*)aux->val);
+				break;
+			case 'd':
+				printf("d:%g", *(float*)aux->val);
+				break;
+			case 'Z':
+			case 'H':
+				printf("%c:%s", aux->type, (char*)aux->val);
+				break;
+		}
+
+		aux = aux->next;
+	}
+
+	printf("\n");
 }
 
 
