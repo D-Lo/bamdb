@@ -25,7 +25,8 @@ char *bam_str_key(const bam1_t *row, const char* key, char *work_buffer);
 typedef struct aux_elm {
 	char key[2];
         char type;
-        // XXX: add subtype?
+        char subtype;
+        size_t val_size;
         void *val;
 	struct aux_elm *next;
 } aux_elm_t;

@@ -413,7 +413,7 @@ main(int argc, char *argv[]) {
 void
 print_bx_rows(char **input_file_name, char **db_path, char **bx)
 {
-    bam_row_set_t *row_set = get_bam_rows(*input_file_name, *db_path, "bx", *bx);
+    bam_row_set_t *row_set = get_bam_rows(*input_file_name, *db_path, "BX", *bx);
 
     if (row_set != NULL) {
 	for (size_t j = 0; j < row_set->n_entries; ++j) {

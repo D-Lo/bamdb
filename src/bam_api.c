@@ -159,17 +159,15 @@ bam_str_key(const bam1_t *row, const char* key, char *work_buffer)
 static void
 populate_aux_tags(aux_list_t *list, const bam1_t *row)
 {
-	// XXX: do we need a working buffer?
 	/* Tags are stored as TAGTYPEVALUE
 	 * TAG is two characters
 	 * TYPE is a single character
 	 * Example: QTZAAFFFKKK which indicates a
-	 * string tag of QT with a value of AAFFFKKK */
+	 * string tag of QT with a value of AAFFFKKK
+	 * This format is specified at
+	 * https://samtools.github.io/hts-specs/SAMv1.pdf */
 	uint8_t *aux;
-	uint8_t type = 0, sub_type = 0;
-	size_t aux_bytes = 0;
-	uint32_t arr_size;
-	char *dummy = 0;
+	uint32_t arr_size = 0;
 
 	list->n_tags = 0;
 	list->head = NULL;
@@ -187,64 +185,75 @@ populate_aux_tags(aux_list_t *list, const bam1_t *row)
 		/* TODO: add error handling for values that don't conform to type */
 		switch(new_aux->type) {
 			case 'A': /* Printable character */
-				new_aux->val = malloc(sizeof(char));
+				new_aux->val_size = sizeof(char);
+				new_aux->val = malloc(new_aux->val_size);
 				memcpy(new_aux->val, aux, 1);
 				aux++;
 				break;
 			case 'C': /* Unsigned 8 bit integer */
-				new_aux->val = malloc(sizeof(uint8_t));
+				new_aux->val_size = sizeof(uint8_t);
+				new_aux->val = malloc(new_aux->val_size);
 				memcpy(new_aux->val, aux, 1);
 				aux++;
 				break;
 			case 'c': /* Signed 8 bit integer */
-				new_aux->val = malloc(sizeof(int8_t));
+				new_aux->val_size = sizeof(int8_t);
+				new_aux->val = malloc(new_aux->val_size);
 				memcpy(new_aux->val, aux, 1);
 				aux++;
 				break;
 			case 'S': /* Unsigned 16 bit integer */
-				new_aux->val = malloc(sizeof(uint16_t));
+				new_aux->val_size = sizeof(uint16_t);
+				new_aux->val = malloc(new_aux->val_size);
 				memcpy(new_aux->val, aux, 2);
 				aux += 2;
 				break;
 			case 's': /* Signed 16 bit integer */
-				new_aux->val = malloc(sizeof(int16_t));
+				new_aux->val_size = sizeof(int16_t);
+				new_aux->val = malloc(new_aux->val_size);
 				memcpy(new_aux->val, aux, 2);
 				aux += 2;
 				break;
 			case 'I': /* Unsigned 32 bit integer */
-				new_aux->val = malloc(sizeof(uint32_t));
+				new_aux->val_size = sizeof(uint32_t);
+				new_aux->val = malloc(new_aux->val_size);
 				memcpy(new_aux->val, aux, 4);
 				aux += 4;
 				break;
 			case 'i': /* Signed 32 bit integer */
-				new_aux->val = malloc(sizeof(int32_t));
+				new_aux->val_size = sizeof(int32_t);
+				new_aux->val = malloc(new_aux->val_size);
 				memcpy(new_aux->val, aux, 4);
 				aux += 4;
 				break;
 			case 'f': /* Single precision floating point */
-				new_aux->val = malloc(sizeof(float));
+				new_aux->val_size = sizeof(float);
+				new_aux->val = malloc(new_aux->val_size);
 				memcpy(new_aux->val, aux, 4);
 				aux += 4;
 				break;
 			case 'd':
 				/* Double precision floating point. This does appear to be in the BAM spec,
 				 * I'm copying from samtools which does provide for this */
-				new_aux->val = malloc(sizeof(float));
+				new_aux->val_size = sizeof(float);
+				new_aux->val = malloc(new_aux->val_size);
 				memcpy(new_aux->val, aux, 4);
 				aux += 4;
 				break;
 			case 'Z': /* Printable string */
 			case 'H': /* Byte array */
-				aux_bytes = 0;
+				new_aux->val_size = 0;
 				/* Determine size of value */
-				while (aux < row->data + row->l_data && *(aux + aux_bytes)) {
-					aux_bytes++;
+				while (aux < row->data + row->l_data &&
+					*(aux + new_aux->val_size)) {
+					new_aux->val_size++;
 				}
-				new_aux->val = malloc(aux_bytes);
-				memcpy(new_aux->val, aux, aux_bytes);
-				aux += aux_bytes + 1; // XXX: padding byte?
+
+				new_aux->val_size++; /* Space for NULL byte */
+				new_aux->val = malloc(new_aux->val_size);
+				memcpy(new_aux->val, aux, new_aux->val_size);
+				aux += new_aux->val_size;
 				break;
-// TODO: Implement support for array types 
 #if 0
 			case 'B': /* Integer or numeric array */
 				sub_type = *(aux++);
@@ -356,14 +365,6 @@ get_bam_row(int64_t offset, samFile *input_file, bam_hdr_t *header)
 }
 
 
-static void
-print_bam_tags()
-{
-
-
-}
-
-
 void
 print_sequence_row(bam_sequence_row_t *row)
 {
@@ -428,6 +429,15 @@ print_sequence_row(bam_sequence_row_t *row)
 void
 destroy_bam_sequence_row(bam_sequence_row_t *row)
 {
+	aux_elm_t *elm = row->aux_list.head;
+	aux_elm_t *garbage = NULL;
+	while (elm) {
+		garbage = elm;
+		elm = elm->next;
+		free(garbage->val);
+		free(garbage);
+	}
+
 	free(row->qname);
 	free(row->rname);
 	free(row->cigar);
