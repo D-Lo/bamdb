@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 3.6)
 
 project(bamdb)
 
@@ -27,6 +27,7 @@ target_link_libraries(bamdb ${LIBS})
 
 # Create bamdb library
 add_library(libbamdb SHARED ${SOURCES})
+target_link_libraries(libbamdb ${LIBS})
 set_target_properties(libbamdb PROPERTIES OUTPUT_NAME "bamdb")
 
 # Default install path. Can be overridden with DESTDIR
