@@ -167,7 +167,6 @@ populate_aux_tags(aux_list_t *list, const bam1_t *row)
 	 * This format is specified at
 	 * https://samtools.github.io/hts-specs/SAMv1.pdf */
 	uint8_t *aux;
-	uint32_t arr_size = 0;
 
 	list->n_tags = 0;
 	list->head = NULL;
@@ -254,57 +253,9 @@ populate_aux_tags(aux_list_t *list, const bam1_t *row)
 				memcpy(new_aux->val, aux, new_aux->val_size);
 				aux += new_aux->val_size;
 				break;
-#if 0
 			case 'B': /* Integer or numeric array */
-				sub_type = *(aux++);
-				memcpy(&arr_size, aux, 4);
-
-				sprintf(buffer + buffer_pos, "B:%c", sub_type);
-				buffer_pos += 3;
-				for (int i = 0; i < arr_size; ++i) {
-					sprintf(buffer + buffer_pos, ",");
-					buffer_pos++;
-					switch (sub_type) {
-						case 'c':
-							sprintf(buffer + buffer_pos, "%d", *aux);
-							buffer_pos += get_int_chars(*aux);
-							aux++;
-							break;
-						case 'C':
-							sprintf(buffer + buffer_pos, "%" PRId8, *(int8_t*)aux);
-							buffer_pos += get_int_chars(*aux);
-							aux++;
-							break;
-						case 'S':
-							sprintf(buffer + buffer_pos, "%" PRIu16, *(uint16_t*)aux);
-							buffer_pos += get_int_chars(*aux);
-							aux += 2;
-							break;
-						case 's':
-							sprintf(buffer + buffer_pos, "%" PRId16, *(int16_t*)aux);
-							buffer_pos += get_int_chars(*aux);
-							aux += 2;
-							break;
-						case 'I':
-							sprintf(buffer + buffer_pos, "i:%" PRIu32, *(uint32_t*)aux);
-							buffer_pos += 2 + get_int_chars(*aux);
-							aux += 4;
-							break;
-						case 'i':
-							sprintf(buffer + buffer_pos, "i:%" PRId32, *(int32_t*)aux);
-							buffer_pos += 2 + get_int_chars(*aux);
-							aux += 4;
-							break;
-						case 'f': /* Single precision floating point */
-							sprintf(buffer + buffer_pos, "f:%g", *(float*)aux);
-							/* Figure out how many chars the fp takes as a string */
-							buffer_pos += 2 + snprintf(dummy, 0, "%g", *(float*)aux);
-							aux += 4;
-							break;
-					}
-				}
+				fprintf(stderr, "Support for array keys has not been implemented yet");
 				break;
-#endif
 		}
 
 		if (list->head == NULL) {

@@ -26,7 +26,7 @@ typedef struct aux_elm {
 	char key[2];
         char type;
         char subtype;
-        size_t val_size;
+        uint32_t val_size;
         void *val;
 	struct aux_elm *next;
 } aux_elm_t;
