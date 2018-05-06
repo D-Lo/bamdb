@@ -1,5 +1,6 @@
 #include <inttypes.h>
 #include <math.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -156,8 +157,8 @@ bam_str_key(const bam1_t *row, const char* key, char *work_buffer)
 }
 
 
-static void
-populate_aux_tags(aux_list_t *list, const bam1_t *row)
+static int
+populate_aux_tags(aux_list_t *row_list, bam_aux_header_list_t *row_set_tags, const bam1_t *row)
 {
 	/* Tags are stored as TAGTYPEVALUE
 	 * TAG is two characters
@@ -167,22 +168,51 @@ populate_aux_tags(aux_list_t *list, const bam1_t *row)
 	 * This format is specified at
 	 * https://samtools.github.io/hts-specs/SAMv1.pdf */
 	uint8_t *aux;
+	int ret = 0;
+	bool present_in_row_set = false;
+	bam_aux_header_t *header_tag = row_set_tags->head;
 
-	list->n_tags = 0;
-	list->head = NULL;
-	list->tail = NULL;
+
+	row_list->n_tags = 0;
+	row_list->head = NULL;
+	row_list->tail = NULL;
 
 	aux = bam_get_aux(row);
 	while (aux+4 <= row->data + row->l_data) {
+		while (header_tag) {
+			if (aux[0] == header_tag->key.key[0] && 
+				aux[1] == header_tag->key.key[1]) {
+				present_in_row_set = true;
+				break;
+			}
+			header_tag = header_tag->next;
+		}
+
+		if (present_in_row_set == false) {
+			bam_aux_header_t *new_header = calloc(1, sizeof(bam_aux_header_t));
+			new_header->key.key[0] = aux[0];
+			new_header->key.key[1] = aux[1];
+			new_header->key.type = aux[2];
+
+			if (row_set_tags->head == NULL) {
+			    row_set_tags->head = new_header;
+			}
+
+			if (row_set_tags->tail != NULL) {
+			    row_set_tags->tail->next = new_header;
+			}
+			row_set_tags->tail = new_header;
+		}
+
 		aux_elm_t *new_aux = calloc(1, sizeof(aux_elm_t));
 
-		new_aux->key[0] = aux[0];
-		new_aux->key[1] = aux[1];
-		new_aux->type = aux[2];
+		new_aux->key.key[0] = aux[0];
+		new_aux->key.key[1] = aux[1];
+		new_aux->key.type = aux[2];
 		aux += 3;
 
 		/* TODO: add error handling for values that don't conform to type */
-		switch(new_aux->type) {
+		switch(new_aux->key.type) {
 			case 'A': /* Printable character */
 				new_aux->val_size = sizeof(char);
 				new_aux->val = malloc(new_aux->val_size);
@@ -255,30 +285,36 @@ populate_aux_tags(aux_list_t *list, const bam1_t *row)
 				break;
 			case 'B': /* Integer or numeric array */
 				fprintf(stderr, "Support for array keys has not been implemented yet");
-				break;
+				/* TODO: Named error codes */
+				ret = -1;
+				free(new_aux);
+				goto exit;
 		}
 
-		if (list->head == NULL) {
-		    list->head = new_aux;
+		if (row_list->head == NULL) {
+		    row_list->head = new_aux;
 		}
 
-		if (list->tail != NULL) {
-		    list->tail->next = new_aux;
+		if (row_list->tail != NULL) {
+		    row_list->tail->next = new_aux;
 		}
-		list->tail = new_aux;
+		row_list->tail = new_aux;
 
-		list->n_tags++;
+		row_list->n_tags++;
 	}
 
+exit:
+	return ret;
 }
 
 
-bam_sequence_row_t *
-deserialize_bam_row(const bam1_t *row, const bam_hdr_t *header)
+static int
+deserialize_bam_row_core(bam_sequence_row_t **output, const bam1_t *row, const bam_hdr_t *header)
 {
 	bam_sequence_row_t *r = malloc(sizeof(bam_sequence_row_t));
 	char *temp = malloc(WORK_BUFFER_SIZE);
 	char *work_buffer = temp;
+	int ret = 0;
 
 	r->qname = strdup(bam_get_qname(row));
 	r->flag = row->core.flag;
@@ -293,24 +329,40 @@ deserialize_bam_row(const bam1_t *row, const bam_hdr_t *header)
 	r->seq = strdup(bam_seq_str(row, work_buffer));
 	work_buffer = temp;
 	r->qual = strdup(bam_qual_str(row, work_buffer));
-	populate_aux_tags(&r->aux_list, row);
 
-	return r;
+	*output = r;
+	free(temp);
+	return ret;
+}
+
+int
+deserialize_bam_row(bam_sequence_row_t **out, bam_aux_header_list_t *tag_list,
+	const bam1_t *row, const bam_hdr_t *header)
+{
+	int ret = 0;
+	deserialize_bam_row_core(out, row, header);
+	populate_aux_tags(&(*out)->aux_list, tag_list, row);
+
+	return ret;
 }
 
 
-bam_sequence_row_t *
-get_bam_row(int64_t offset, samFile *input_file, bam_hdr_t *header)
+int
+get_bam_row(bam_sequence_row_t **out, bam_aux_header_list_t *tag_list, 
+	const int64_t offset, samFile *input_file, bam_hdr_t *header)
 {
+	int ret = 0;
 	bam1_t *bam_row = bam_init1();
 	int64_t src = 0;
-	int r = 0;
-	bam_sequence_row_t *ret = NULL;
 
 	src = bgzf_seek(input_file->fp.bgzf, offset, SEEK_SET);
-	r = sam_read1(input_file, header, bam_row);
-	ret = deserialize_bam_row(bam_row, header);
+	ret = sam_read1(input_file, header, bam_row);
+	if (ret < 0) {
+		goto exit;
+	}
+	deserialize_bam_row(out, tag_list, bam_row, header);
 
+exit:
 	bam_destroy1(bam_row);
 	return ret;
 }
@@ -333,10 +385,10 @@ print_sequence_row(bam_sequence_row_t *row)
 	printf("\t%s", row->seq);
 	printf("\t%s", row->qual);
 
-	while (aux != NULL) {
-		printf("\t%c%c:", aux->key[0], aux->key[1]);
+	while (aux) {
+		printf("\t%c%c:", aux->key.key[0], aux->key.key[1]);
 
-		switch(aux->type) {
+		switch(aux->key.type) {
 			case 'A':
 				printf("A:%c", *(char*)aux->val);
 				break;
@@ -366,7 +418,7 @@ print_sequence_row(bam_sequence_row_t *row)
 				break;
 			case 'Z':
 			case 'H':
-				printf("%c:%s", aux->type, (char*)aux->val);
+				printf("%c:%s", aux->key.type, (char*)aux->val);
 				break;
 		}
 

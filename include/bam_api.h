@@ -22,10 +22,14 @@ char *bam_qual_str(const bam1_t *row, char *work_buffer);
  */
 char *bam_str_key(const bam1_t *row, const char* key, char *work_buffer);
 
-typedef struct aux_elm {
+typedef struct aux_elm_key {
 	char key[2];
         char type;
         char subtype;
+} aux_elm_key_t;
+
+typedef struct aux_elm {
+	aux_elm_key_t key;
         uint32_t val_size;
         void *val;
 	struct aux_elm *next;
@@ -52,9 +56,20 @@ typedef struct bam_sequence_row {
         aux_list_t aux_list;
 } bam_sequence_row_t;
 
+typedef struct bam_aux_header {
+	aux_elm_key_t key;
+        struct bam_aux_header *next;
+} bam_aux_header_t;
+
+typedef struct bam_aux_header_list {
+	bam_aux_header_t *head;
+        bam_aux_header_t *tail;
+} bam_aux_header_list_t;
+
 typedef struct bam_row_set {
 	size_t n_entries;
 	bam_sequence_row_t **rows;
+        bam_aux_header_list_t aux_tags;
 } bam_row_set_t;
 
 typedef struct offset_node {
@@ -67,8 +82,10 @@ typedef struct offset_list {
 	struct offset_node *tail;
 } offset_list_t;
 
-bam_sequence_row_t *deserialize_bam_row(const bam1_t *row, const bam_hdr_t *header);
-bam_sequence_row_t *get_bam_row(int64_t offset, samFile *input_file, bam_hdr_t *header);
+int deserialize_bam_row(bam_sequence_row_t **out, bam_aux_header_list_t *tag_list,
+        const bam1_t *row, const bam_hdr_t *header);
+int get_bam_row(bam_sequence_row_t **out, bam_aux_header_list_t *tag_list,
+	const int64_t offset, samFile *input_file, bam_hdr_t *header);
 void print_sequence_row(bam_sequence_row_t *row);
 void destroy_bam_sequence_row(bam_sequence_row_t *row);
 void free_row_set(bam_row_set_t *row_set);
