@@ -216,7 +216,7 @@ populate_aux_tags(aux_list_t *row_list, bam_aux_header_list_t *row_set_tags, con
 			case 'A': /* Printable character */
 				new_aux->val_size = sizeof(char);
 				new_aux->val = malloc(new_aux->val_size);
-				memcpy(new_aux->val, aux, 1);
+				memcpy(new_aux->val, aux, new_aux->val_size);
 				aux++;
 				break;
 			case 'C': /* Unsigned 8 bit integer */
@@ -279,8 +279,8 @@ populate_aux_tags(aux_list_t *row_list, bam_aux_header_list_t *row_set_tags, con
 				}
 
 				new_aux->val_size++; /* Space for NULL byte */
-				new_aux->val = malloc(new_aux->val_size);
-				memcpy(new_aux->val, aux, new_aux->val_size);
+				new_aux->val = calloc(1, new_aux->val_size);
+				memcpy(new_aux->val, aux, new_aux->val_size - 1);
 				aux += new_aux->val_size;
 				break;
 			case 'B': /* Integer or numeric array */
