@@ -180,7 +180,7 @@ populate_aux_tags(aux_list_t *row_list, bam_aux_header_list_t *row_set_tags, con
 	aux = bam_get_aux(row);
 	while (aux+4 <= row->data + row->l_data) {
 		while (header_tag) {
-			if (aux[0] == header_tag->key.key[0] && 
+			if (aux[0] == header_tag->key.key[0] &&
 				aux[1] == header_tag->key.key[1]) {
 				present_in_row_set = true;
 				break;
@@ -348,7 +348,7 @@ deserialize_bam_row(bam_sequence_row_t **out, bam_aux_header_list_t *tag_list,
 
 
 int
-get_bam_row(bam_sequence_row_t **out, bam_aux_header_list_t *tag_list, 
+get_bam_row(bam_sequence_row_t **out, bam_aux_header_list_t *tag_list,
 	const int64_t offset, samFile *input_file, bam_hdr_t *header)
 {
 	int ret = 0;
