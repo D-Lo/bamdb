@@ -508,6 +508,7 @@ get_bam_rows(const char *input_file_name, const char *db_path, const char *key_t
 	offset_node_t *offset_node;
 	bam_row_set_t *row_set = NULL;
 	int i = 0;
+        int ret = 0;
 
 	if ((input_file = sam_open(input_file_name, "r")) == 0) {
 		fprintf(stderr, "Unable to open file %s\n", input_file_name);
@@ -526,14 +527,14 @@ get_bam_rows(const char *input_file_name, const char *db_path, const char *key_t
 		return NULL;
 	}
 
-	row_set = malloc(sizeof(bam_row_set_t));
+	row_set = calloc(1, sizeof(bam_row_set_t));
 	row_set->n_entries = n_rows;
 	row_set->rows = malloc(n_rows * sizeof(bam_row_set_t));
 
 	offset_node = offset_list->head;
 	while (offset_node != NULL) {
 		/* TODO: make sure we don't overrun row_set */
-		row_set->rows[i] = get_bam_row(offset_node->offset, input_file, header);
+                ret = get_bam_row(&row_set->rows[i], &row_set->aux_tags, offset_node->offset, input_file, header);
 		offset_node = offset_node->next;
 		i++;
 	}
