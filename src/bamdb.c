@@ -369,41 +369,35 @@ int main(int argc, char *argv[]) {
       /* Write resulting rows to file */
       offset_list_t *offset_list = calloc(1, sizeof(offset_list_t));
 
-      rc =
-          get_offsets(offset_list, bam_args.index_file_name, "BX", bam_args.bx);
+      rc = get_offsets_lmdb(offset_list, bam_args.index_file_name, "BX",
+                            bam_args.bx);
       rc = write_row_subset(bam_args.input_file_name, offset_list,
                             bam_args.output_file_name);
       free(offset_list);
     } else {
       /* Print rows in tab delim format */
-      bam_row_set_t *row_set =
-          get_bam_rows(bam_args.input_file_name, bam_args.index_file_name, "BX",
-                       bam_args.bx);
+      bam_row_set_t *row_set = NULL;
+      rc = get_bam_rows(&row_set, bam_args.input_file_name,
+                        bam_args.index_file_name, "BX", bam_args.bx);
 
       if (row_set != NULL) {
-        for (size_t j = 0; j < row_set->n_entries; ++j) {
+        for (size_t j = 0; j < row_set->num_entries; ++j) {
           print_sequence_row(row_set->rows[j]);
         }
         free_row_set(row_set);
       }
     }
   }
-
-  if (bam_args.convert_to == BAMDB_CONVERT_TO_LMDB) {
-    rc = generate_index_file(bam_args.input_file_name,
-                             bam_args.output_file_name);
-  }
-
-  return rc;
 }
 
 void print_bx_rows(char **input_file_name, char **db_path, char **bx) {
-  bam_row_set_t *row_set = get_bam_rows(*input_file_name, *db_path, "BX", *bx);
+  int rc = 0;
+  bam_row_set_t *row_set = NULL;
+  rc = get_bam_rows(&row_set, *input_file_name, *db_path, "BX", *bx);
 
   if (row_set != NULL) {
-    for (size_t j = 0; j < row_set->n_entries; ++j) {
+    for (size_t j = 0; j < row_set->num_entries; ++j) {
       print_sequence_row(row_set->rows[j]);
     }
-    free_row_set(row_set);
   }
 }
