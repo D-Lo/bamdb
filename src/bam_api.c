@@ -9,6 +9,7 @@
 #include "htslib/sam.h"
 
 #include "bam_api.h"
+#include "bamdb_status.h"
 
 #define get_int_chars(i) ((i == 0) ? 1 : floor(log10(abs(i))) + 1)
 
@@ -329,13 +330,15 @@ int deserialize_bam_row(bam_sequence_row_t **out,
 
 int get_bam_row(bam_sequence_row_t **out, bam_aux_header_list_t *tag_list,
                 const int64_t offset, samFile *input_file, bam_hdr_t *header) {
-  int ret = 0;
+  int ret = BAMDB_SUCCESS;
+  int rc = 0;
   bam1_t *bam_row = bam_init1();
   int64_t src = 0;
 
   src = bgzf_seek(input_file->fp.bgzf, offset, SEEK_SET);
-  ret = sam_read1(input_file, header, bam_row);
-  if (ret < 0) {
+  rc = sam_read1(input_file, header, bam_row);
+  if (rc < 0) {
+    ret = BAMDB_SEQUENCE_FILE_ERROR;
     goto exit;
   }
   deserialize_bam_row(out, tag_list, bam_row, header);
@@ -421,7 +424,7 @@ void destroy_bam_sequence_row(bam_sequence_row_t *row) {
 }
 
 void free_row_set(bam_row_set_t *row_set) {
-  for (int i = 0; i < row_set->n_entries; ++i) {
+  for (int i = 0; i < row_set->num_entries; ++i) {
     free(row_set->rows[i]);
   }
   free(row_set);

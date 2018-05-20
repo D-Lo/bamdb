@@ -67,7 +67,7 @@ typedef struct bam_aux_header_list {
 } bam_aux_header_list_t;
 
 typedef struct bam_row_set {
-  size_t n_entries;
+  size_t num_entries;
   bam_sequence_row_t **rows;
   bam_aux_header_list_t aux_tags;
 } bam_row_set_t;
@@ -78,6 +78,7 @@ typedef struct offset_node {
 } offset_node_t;
 
 typedef struct offset_list {
+  size_t num_entries;
   struct offset_node *head;
   struct offset_node *tail;
 } offset_list_t;

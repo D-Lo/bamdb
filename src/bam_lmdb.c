@@ -13,6 +13,7 @@
 
 #include "bam_api.h"
 #include "bam_lmdb.h"
+#include "bamdb_status.h"
 
 #include "htslib/bgzf.h"
 #include "htslib/hts.h"
@@ -420,57 +421,64 @@ exit:
   return ret;
 }
 
-static MDB_env *open_ro_handle(MDB_dbi *dbi, MDB_cursor **cur, MDB_txn *txn,
-                               const char *key_name, const char *db_path) {
-  MDB_env *env = NULL;
-  int rc = 0;
+static int open_ro_handle(MDB_env *output, MDB_dbi *dbi, MDB_cursor **cur,
+                          MDB_txn *txn, const char *key_name,
+                          const char *db_path) {
   char target_path[MAX_PATH_CHARS];
+  int rc = 0;
 
   snprintf(target_path, MAX_PATH_CHARS, "%s/%s", db_path, key_name);
-  env = set_up_lmdb_env(target_path, true);
-  if (env == NULL) {
-    return NULL;
+  output = set_up_lmdb_env(target_path, true);
+  if (output == NULL) {
+    return BAMDB_DB_ERROR;
   }
 
-  rc = mdb_txn_begin(env, NULL, MDB_RDONLY, &txn);
+  rc = mdb_txn_begin(output, NULL, MDB_RDONLY, &txn);
   if (rc != MDB_SUCCESS) {
-    fprintf(stderr, "Error beginning transaction: %s\n", mdb_strerror(rc));
-    return NULL;
+    fprintf(stderr, "Error beginning LMDB transaction: %s\n", mdb_strerror(rc));
+    return BAMDB_DB_ERROR;
   }
 
   rc = mdb_dbi_open(txn, NULL, MDB_DUPSORT | MDB_DUPFIXED, dbi);
   if (rc != MDB_SUCCESS) {
-    fprintf(stderr, "Error opening database %s\n", mdb_strerror(rc));
-    return NULL;
+    fprintf(stderr, "Error opening LMDB database handle: %s\n",
+            mdb_strerror(rc));
+    return BAMDB_DB_ERROR;
   }
 
   rc = mdb_cursor_open(txn, *dbi, cur);
   if (rc != MDB_SUCCESS) {
-    fprintf(stderr, "Error getting cursor: %s\n", mdb_strerror(rc));
-    return NULL;
+    fprintf(stderr, "Error creating LMDB cursor: %s\n", mdb_strerror(rc));
+    return BAMDB_DB_ERROR;
   }
 
-  return env;
+  return BAMDB_SUCCESS;
 }
 
-int get_offsets(offset_list_t *offset_list, const char *db_path,
-                const char *index_name, const char *key) {
+int get_offsets_lmdb(offset_list_t *offset_list, const char *db_path,
+                     const char *index_name, const char *key) {
   MDB_env *env = NULL;
   MDB_dbi dbi;
   MDB_cursor *cur = NULL;
   MDB_txn *txn = NULL;
   MDB_val db_key, data;
   int rc;
-  int rows = 0;
 
   db_key.mv_size = strlen(key);
   db_key.mv_data = strdup(key);
 
-  env = open_ro_handle(&dbi, &cur, txn, index_name, db_path);
+  rc = open_ro_handle(env, &dbi, &cur, txn, index_name, db_path);
+  if (rc != MDB_SUCCESS) {
+    return BAMDB_DB_ERROR;
+  }
 
-  if ((rc = mdb_cursor_get(cur, &db_key, &data, MDB_SET)) != MDB_SUCCESS) {
-    fprintf(stderr, "Error getting key: %s\n", mdb_strerror(rc));
-    return -1;
+  rc = mdb_cursor_get(cur, &db_key, &data, MDB_SET);
+
+  if (rc == MDB_NOTFOUND) {
+    /* No matching rows for the given index query */
+    return BAMDB_SUCCESS;
+  } else if (rc != MDB_SUCCESS) {
+    return BAMDB_DB_ERROR;
   }
   if ((rc = mdb_cursor_get(cur, &db_key, &data, MDB_FIRST_DUP)) == 0) {
     offset_node_t *new_node = calloc(1, sizeof(offset_node_t));
@@ -478,7 +486,7 @@ int get_offsets(offset_list_t *offset_list, const char *db_path,
 
     offset_list->head = new_node;
     offset_list->tail = new_node;
-    rows++;
+    offset_list->num_entries++;
 
     while ((rc = mdb_cursor_get(cur, &db_key, &data, MDB_NEXT_DUP)) == 0) {
       offset_node_t *new_node = calloc(1, sizeof(offset_node_t));
@@ -486,55 +494,54 @@ int get_offsets(offset_list_t *offset_list, const char *db_path,
 
       offset_list->tail->next = new_node;
       offset_list->tail = new_node;
-      rows++;
+      offset_list->num_entries++;
     }
   }
 
   mdb_cursor_close(cur);
   mdb_txn_abort(txn);
-  return rows;
+  return BAMDB_SUCCESS;
 }
 
-bam_row_set_t *get_bam_rows(const char *input_file_name, const char *db_path,
-                            const char *key_type, const char *key_value) {
+int get_bam_rows(bam_row_set_t **output, const char *input_file_name,
+                 const char *db_path, const char *index_name, const char *key) {
   samFile *input_file = 0;
   bam_hdr_t *header = NULL;
-  int n_rows = 0;
-  offset_list_t *offset_list = NULL;
   offset_node_t *offset_node;
-  bam_row_set_t *row_set = NULL;
+  offset_list_t *offsets;
   int i = 0;
-  int ret = 0;
+  int rc = 0;
+  int ret = BAMDB_SUCCESS;
 
   if ((input_file = sam_open(input_file_name, "r")) == 0) {
-    fprintf(stderr, "Unable to open file %s\n", input_file_name);
-    return NULL;
+    return BAMDB_SEQUENCE_FILE_ERROR;
   }
 
   header = sam_hdr_read(input_file);
   if (header == NULL) {
-    fprintf(stderr, "Unable to read the header from %s\n", input_file->fn);
-    return NULL;
+    return BAMDB_DB_ERROR;
   }
 
-  offset_list = calloc(1, sizeof(offset_list_t));
-  n_rows = get_offsets(offset_list, db_path, key_type, key_value);
-  if (n_rows <= 0) {
-    return NULL;
+  offsets = calloc(1, sizeof(offset_list_t));
+  rc = get_offsets_lmdb(offsets, db_path, index_name, key);
+  if (rc != 0) {
+    free(offsets);
+    return rc;
   }
 
-  row_set = calloc(1, sizeof(bam_row_set_t));
-  row_set->n_entries = n_rows;
-  row_set->rows = malloc(n_rows * sizeof(bam_row_set_t));
+  *output = calloc(1, sizeof(bam_row_set_t));
+  (*output)->num_entries = offsets->num_entries;
+  (*output)->rows = malloc((*output)->num_entries * sizeof(bam_row_set_t));
 
-  offset_node = offset_list->head;
+  offset_node = offsets->head;
   while (offset_node != NULL) {
     /* TODO: make sure we don't overrun row_set */
-    ret = get_bam_row(&row_set->rows[i], &row_set->aux_tags,
+    ret = get_bam_row(&(*output)->rows[i], &(*output)->aux_tags,
                       offset_node->offset, input_file, header);
     offset_node = offset_node->next;
     i++;
   }
 
-  return row_set;
+  free(offsets);
+  return BAMDB_SUCCESS;
 }
