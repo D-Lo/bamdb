@@ -4,6 +4,8 @@ project(bamdb)
 
 set(CMAKE_C_FLAGS "-Wall -g -std=gnu99 -fPIC")
 
+option(STATIC_BAMDB_BUILD "STATIC_BAMDB_BUILD" OFF)
+
 # External dependencies
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 find_package(CK REQUIRED)
@@ -33,14 +35,19 @@ add_executable(bamdb ${SOURCES})
 target_link_libraries(bamdb ${LIBS})
 
 # Create bamdb library
-add_library(libbamdb SHARED ${SOURCES})
+if(STATIC_BAMDB_BUILD)
+  add_library(libbamdb STATIC ${SOURCES})
+else(STATIC_BAMDB_BUILD)
+  add_library(libbamdb SHARED ${SOURCES})
+endif(STATIC_BAMDB_BUILD)
+
 target_link_libraries(libbamdb ${LIBS})
 set_target_properties(libbamdb PROPERTIES OUTPUT_NAME "bamdb")
 
 # Default install path. Can be overridden with DESTDIR
 install(TARGETS bamdb RUNTIME DESTINATION bin)
 install(DIRECTORY include/
-  DESTINATION include/bamdb) 
+  DESTINATION include/bamdb)
 install(TARGETS libbamdb
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib)
