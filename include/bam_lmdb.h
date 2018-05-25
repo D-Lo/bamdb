@@ -17,8 +17,11 @@ typedef struct indices {
   char **key_indices;
 } indices_t;
 
-int convert_to_lmdb(samFile *input_file, char *db_path,
-                    indices_t *target_indices);
+char *get_default_dbname(const char *filename);
+
+int get_lmdb_env(MDB_env **env, const char *full_db_path, bool read_only);
+
+int commit_lmdb_transaction(MDB_txn *txn);
 
 /** @brief Return matching bam offsets from an LMDB based index
  *

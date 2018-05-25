@@ -10,6 +10,7 @@
 #include "bam_api.h"
 #include "bam_lmdb.h"
 #include "bamdb.h"
+#include "bamdb_index_writer.h"
 
 // Return number of characters an unsigned int takes when represented in base 10
 #define get_int_chars(i) ((i == 0) ? 1 : floor(log10(i)) + 1)
@@ -296,21 +297,16 @@ int write_row_subset(char *input_file_name, offset_list_t *offset_list,
   return rc;
 }
 
-int generate_index_file(char *input_file_name, char *output_file_name) {
+int generate_index_file(char *input_file_name, char *output_file_name,
+                        indices_t *target_indices) {
   samFile *input_file = 0;
-  indices_t target_indices = {.includes_qname = true,
-                              .num_key_indices = 1,
-                              .key_indices = malloc(sizeof(char *))};
-
-  target_indices.key_indices[0] = malloc(3);
-  strncpy(target_indices.key_indices[0], "BX", 2);
 
   if ((input_file = sam_open(input_file_name, "r")) == 0) {
     fprintf(stderr, "Unable to open file %s\n", input_file_name);
     return 1;
   }
 
-  return convert_to_lmdb(input_file, output_file_name, &target_indices);
+  return generate_lmdb_index(input_file, output_file_name, target_indices);
 }
 
 int main(int argc, char *argv[]) {
@@ -356,7 +352,22 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  /* Get filename from first non option argument */
+  if (bam_args.convert_to == BAMDB_CONVERT_TO_LMDB) {
+    indices_t target_indices = {.includes_qname = true,
+                                .num_key_indices = 1,
+                                .key_indices = malloc(sizeof(char *))};
+
+    target_indices.key_indices[0] = calloc(1, 3);
+    /* Get key name from first non optional argument */
+    if (optind < argc) {
+      strncpy(target_indices.key_indices[0], argv[optind], 2);
+    }
+
+    return generate_index_file(bam_args.input_file_name,
+                               bam_args.output_file_name, &target_indices);
+  }
+
+  /* Get filename from first non optional argument */
   if (optind < argc) {
     strcpy(bam_args.input_file_name, argv[optind]);
   }
