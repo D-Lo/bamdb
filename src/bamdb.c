@@ -8,9 +8,9 @@
 #include "sam.h"
 
 #include "bam_api.h"
-#include "bamdb_lmdb.h"
 #include "bamdb.h"
 #include "bamdb_index_writer.h"
+#include "bamdb_lmdb.h"
 
 // Return number of characters an unsigned int takes when represented in base 10
 #define get_int_chars(i) ((i == 0) ? 1 : floor(log10(i)) + 1)

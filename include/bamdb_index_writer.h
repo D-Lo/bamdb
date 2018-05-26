@@ -1,3 +1,6 @@
+/* Only build if we want write functionality so we can avoid the CK dependency
+ */
+#ifdef BUILD_BAMDB_WRITER
 /**
  * @file bamdb_index_writer.h
  * @brief Functions for creating a bamdb index
@@ -24,4 +27,5 @@
 int generate_lmdb_index(samFile *input_file, char *db_path,
                         bamdb_indices_t *target_indices);
 
+#endif
 #endif

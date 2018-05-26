@@ -4,8 +4,8 @@
 #include <unistd.h>
 
 #include "bam_api.h"
-#include "bamdb_lmdb.h"
 #include "bamdb.h"
+#include "bamdb_lmdb.h"
 
 enum bamdb_convert_to {
   BAMDB_CONVERT_TO_TEXT,

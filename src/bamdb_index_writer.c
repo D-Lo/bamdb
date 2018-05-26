@@ -1,3 +1,5 @@
+#ifdef BUILD_BAMDB_WRITER
+
 #include <inttypes.h>
 #include <pthread.h>
 #include <stdio.h>
@@ -16,8 +18,8 @@
 #include "hts.h"
 
 #include "bam_api.h"
-#include "bamdb_lmdb.h"
 #include "bamdb_index_writer.h"
+#include "bamdb_lmdb.h"
 #include "bamdb_status.h"
 
 /* How many rows to write before forcing a database commit */
@@ -356,3 +358,5 @@ exit:
 
   return ret;
 }
+
+#endif
