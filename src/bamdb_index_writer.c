@@ -16,6 +16,7 @@
 #include "hts.h"
 
 #include "bam_api.h"
+#include "bamdb_lmdb.h"
 #include "bamdb_index_writer.h"
 #include "bamdb_status.h"
 
@@ -222,7 +223,7 @@ static writer_q_t *init_writer_q(char *key) {
 }
 
 int generate_lmdb_index(samFile *input_file, char *db_path,
-                        indices_t *target_indices) {
+                        bamdb_indices_t *target_indices) {
   int rc;
   int r = 0;
   int ret = BAMDB_SUCCESS;
