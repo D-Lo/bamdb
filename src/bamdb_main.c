@@ -4,8 +4,22 @@
 #include <unistd.h>
 
 #include "bam_api.h"
-#include "bam_lmdb.h"
 #include "bamdb.h"
+#include "bamdb_lmdb.h"
+
+enum bamdb_convert_to {
+  BAMDB_CONVERT_TO_TEXT,
+  BAMDB_CONVERT_TO_SQLITE,
+  BAMDB_CONVERT_TO_LMDB
+};
+
+typedef struct bamdb_args {
+  enum bamdb_convert_to convert_to;
+  char input_file_name[MAX_FILENAME];
+  char *index_file_name;
+  char *output_file_name;
+  char *bx;
+} bam_args_t;
 
 int main(int argc, char *argv[]) {
   int rc = 0;
@@ -51,9 +65,9 @@ int main(int argc, char *argv[]) {
   }
 
   if (bam_args.convert_to == BAMDB_CONVERT_TO_LMDB) {
-    indices_t target_indices = {.includes_qname = true,
-                                .num_key_indices = 1,
-                                .key_indices = malloc(sizeof(char *))};
+    bamdb_indices_t target_indices = {.includes_qname = true,
+                                      .num_key_indices = 1,
+                                      .key_indices = malloc(sizeof(char *))};
 
     target_indices.key_indices[0] = calloc(1, 3);
     /* Get key name from first non optional argument */
