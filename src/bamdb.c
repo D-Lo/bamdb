@@ -70,6 +70,7 @@ int write_row_subset(char *input_file_name, offset_list_t *offset_list,
   return rc;
 }
 
+#ifdef BUILD_BAMDB_WRITER
 int generate_index_file(char *input_file_name, char *output_file_name,
                         bamdb_indices_t *target_indices) {
   samFile *input_file = 0;
@@ -81,6 +82,7 @@ int generate_index_file(char *input_file_name, char *output_file_name,
 
   return generate_lmdb_index(input_file, output_file_name, target_indices);
 }
+#endif
 
 void print_bamdb_rows(const char *input_file_name, const char *db_path,
                       const char *index_name, const char *key) {

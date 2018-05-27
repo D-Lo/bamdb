@@ -12,6 +12,8 @@ typedef struct bamdb_indices {
   char **key_indices;
 } bamdb_indices_t;
 
+
+#ifdef BUILD_BAMDB_WRITER
 /** @brief Create an index for a given bam file
  *
  * Currently all bamdb indices are LMDB based, though this function may change
@@ -26,6 +28,7 @@ typedef struct bamdb_indices {
  */
 int generate_index_file(char *input_file_name, char *output_file_name,
                         bamdb_indices_t *target_indices);
+#endif
 
 void print_bamdb_rows(const char *input_file_name, const char *db_path,
                       const char *index_name, const char *key);
