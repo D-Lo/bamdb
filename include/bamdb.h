@@ -4,6 +4,9 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+#include "bamdb_status.h"
+#include "bam_api.h"
+
 #define MAX_FILENAME 1024
 
 typedef struct bamdb_indices {
@@ -11,7 +14,6 @@ typedef struct bamdb_indices {
   size_t num_key_indices;  // Does not include qname index
   char **key_indices;
 } bamdb_indices_t;
-
 
 #ifdef BUILD_BAMDB_WRITER
 /** @brief Create an index for a given bam file
